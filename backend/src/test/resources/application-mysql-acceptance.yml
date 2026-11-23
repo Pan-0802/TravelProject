@@ -1,0 +1,10 @@
+spring:
+  sql:
+    init:
+      mode: never
+app:
+  jwt:
+    secret: test-secret-only-32-bytes-minimum-123456789
+  external:
+    ai-key:
+    amap-key:

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.AttractionMapper">
+  <select id="find" resultType="com.travel.domain.Attraction">SELECT * FROM `attraction` WHERE `attraction_id` = #{id}</select>
+  <select id="lock" resultType="com.travel.domain.Attraction">SELECT * FROM `attraction` WHERE `attraction_id` = #{id} FOR UPDATE</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="attractionId">
+    INSERT INTO `attraction` (`created_by`, `name`, `city`, `category`, `description`, `suggested_duration_minutes`, `reference_ticket_price`)
+    VALUES (#{createdBy}, #{name}, #{city}, #{category}, #{description}, #{suggestedDurationMinutes}, #{referenceTicketPrice})
+  </insert>
+  <update id="update">UPDATE `attraction` SET `created_by` = #{createdBy}, `name` = #{name}, `city` = #{city}, `category` = #{category}, `description` = #{description}, `suggested_duration_minutes` = #{suggestedDurationMinutes}, `reference_ticket_price` = #{referenceTicketPrice} WHERE `attraction_id` = #{attractionId}</update>
+  <delete id="delete">DELETE FROM `attraction` WHERE `attraction_id` = #{id}</delete>
+</mapper>

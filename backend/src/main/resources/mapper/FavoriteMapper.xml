@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.FavoriteMapper">
+  <select id="find" resultType="com.travel.domain.Favorite">SELECT * FROM `favorite` WHERE `favorite_id` = #{id}</select>
+  <select id="lock" resultType="com.travel.domain.Favorite">SELECT * FROM `favorite` WHERE `favorite_id` = #{id} FOR UPDATE</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="favoriteId">
+    INSERT INTO `favorite` (`user_id`, `attraction_id`)
+    VALUES (#{userId}, #{attractionId})
+  </insert>
+  <update id="update">UPDATE `favorite` SET `user_id` = #{userId}, `attraction_id` = #{attractionId} WHERE `favorite_id` = #{favoriteId}</update>
+  <delete id="delete">DELETE FROM `favorite` WHERE `favorite_id` = #{id}</delete>
+</mapper>

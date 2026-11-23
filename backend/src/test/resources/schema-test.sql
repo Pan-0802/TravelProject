@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS `user` (
+ user_id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) NOT NULL UNIQUE,
+ password_hash VARCHAR(255) NOT NULL, nickname VARCHAR(60),
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS trip (
+ trip_id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES `user`(user_id) ON DELETE CASCADE,
+ title VARCHAR(120) NOT NULL,destination VARCHAR(120) NOT NULL,start_date DATE NOT NULL,end_date DATE NOT NULL,
+ total_budget DECIMAL(12,2) NOT NULL CHECK(total_budget>=0),created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CHECK(end_date>=start_date)
+);
+CREATE TABLE IF NOT EXISTS attraction (
+ attraction_id BIGINT AUTO_INCREMENT PRIMARY KEY,created_by BIGINT NOT NULL REFERENCES `user`(user_id) ON DELETE CASCADE,
+ name VARCHAR(120) NOT NULL,city VARCHAR(80) NOT NULL,category VARCHAR(40),description TEXT,
+ suggested_duration_minutes INT,reference_ticket_price DECIMAL(10,2),created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS favorite (
+ favorite_id BIGINT AUTO_INCREMENT PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES `user`(user_id) ON DELETE CASCADE,
+ attraction_id BIGINT NOT NULL REFERENCES attraction(attraction_id) ON DELETE CASCADE,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE(user_id,attraction_id)
+);
+CREATE TABLE IF NOT EXISTS trip_day (
+ day_id BIGINT AUTO_INCREMENT PRIMARY KEY,trip_id BIGINT NOT NULL REFERENCES trip(trip_id) ON DELETE CASCADE,
+ trip_date DATE NOT NULL,description VARCHAR(255),UNIQUE(trip_id,trip_date)
+);
+CREATE TABLE IF NOT EXISTS itinerary_item (
+ item_id BIGINT AUTO_INCREMENT PRIMARY KEY,day_id BIGINT NOT NULL REFERENCES trip_day(day_id) ON DELETE CASCADE,
+ attraction_id BIGINT REFERENCES attraction(attraction_id) ON DELETE SET NULL,item_name VARCHAR(150) NOT NULL,
+ start_time TIME,end_time TIME,sort_order INT NOT NULL,transportation VARCHAR(60),estimated_cost DECIMAL(10,2) NOT NULL,
+ source_type VARCHAR(12) NOT NULL,note VARCHAR(500)
+);
+CREATE TABLE IF NOT EXISTS expense (
+ expense_id BIGINT AUTO_INCREMENT PRIMARY KEY,trip_id BIGINT NOT NULL REFERENCES trip(trip_id) ON DELETE CASCADE,
+ category VARCHAR(20) NOT NULL,amount DECIMAL(12,2) NOT NULL CHECK(amount>0),spent_on DATE NOT NULL,description VARCHAR(300),created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- TEXT deliberately substitutes MySQL JSON; MySQL-specific JSON behavior needs MySQL acceptance tests.
+CREATE TABLE IF NOT EXISTS ai_plan_record (
+ ai_plan_id BIGINT AUTO_INCREMENT PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES `user`(user_id) ON DELETE CASCADE,
+ trip_id BIGINT REFERENCES trip(trip_id) ON DELETE SET NULL,request_json TEXT NOT NULL,response_json TEXT,
+ estimated_total DECIMAL(12,2),status VARCHAR(12) NOT NULL,error_message VARCHAR(500),created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,saved_at TIMESTAMP
+);

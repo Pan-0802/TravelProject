@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.TripMapper">
+  <select id="find" resultType="com.travel.domain.Trip">SELECT * FROM `trip` WHERE `trip_id` = #{id}</select>
+  <select id="lock" resultType="com.travel.domain.Trip">SELECT * FROM `trip` WHERE `trip_id` = #{id} FOR UPDATE</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="tripId">
+    INSERT INTO `trip` (`user_id`, `title`, `destination`, `start_date`, `end_date`, `total_budget`)
+    VALUES (#{userId}, #{title}, #{destination}, #{startDate}, #{endDate}, #{totalBudget})
+  </insert>
+  <update id="update">UPDATE `trip` SET `user_id` = #{userId}, `title` = #{title}, `destination` = #{destination}, `start_date` = #{startDate}, `end_date` = #{endDate}, `total_budget` = #{totalBudget} WHERE `trip_id` = #{tripId}</update>
+  <delete id="delete">DELETE FROM `trip` WHERE `trip_id` = #{id}</delete>
+</mapper>

@@ -1,0 +1,174 @@
+/* ===== 全局基础样式 ===== */
+:root {
+  --tp-primary: #3f7ef7;
+  --tp-bg: #f4f6fb;
+  --tp-card-bg: #ffffff;
+  --tp-text: #1f2d3d;
+  --tp-text-secondary: #6b7a90;
+  --tp-border: #e4e8f0;
+  --tp-radius: 12px;
+  --tp-shadow: 0 2px 12px rgba(31, 45, 61, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--tp-bg);
+  color: var(--tp-text);
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--tp-primary);
+  text-decoration: none;
+}
+
+/* ===== 页面通用容器 ===== */
+.page {
+  padding: 20px 24px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tp-card {
+  background: var(--tp-card-bg);
+  border-radius: var(--tp-radius);
+  box-shadow: var(--tp-shadow);
+  border: 1px solid var(--tp-border);
+}
+
+.tp-card + .tp-card {
+  margin-top: 16px;
+}
+
+.tp-card__body {
+  padding: 18px 20px;
+}
+
+.tp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tp-toolbar__spacer {
+  flex: 1 1 auto;
+}
+
+.tp-muted {
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+}
+
+.tp-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tp-money--over {
+  color: #e6483d;
+}
+
+.tp-empty {
+  padding: 32px 12px;
+  text-align: center;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+}
+
+/* ===== 统计卡片 ===== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--tp-border);
+  border-radius: var(--tp-radius);
+  padding: 16px 18px;
+  box-shadow: var(--tp-shadow);
+}
+
+.stat-card__label {
+  font-size: 13px;
+  color: var(--tp-text-secondary);
+  margin-bottom: 8px;
+}
+
+.stat-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card__extra {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--tp-text-secondary);
+}
+
+/* ===== 元素微调 ===== */
+.el-table .cell {
+  line-height: 1.5;
+}
+
+.el-card__header {
+  font-weight: 600;
+}
+
+.chart-box {
+  width: 100%;
+  height: 320px;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 14px 12px 32px;
+  }
+  .page-title {
+    font-size: 19px;
+  }
+  .chart-box {
+    height: 260px;
+  }
+}

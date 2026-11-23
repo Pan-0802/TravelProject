@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.AiPlanRecordMapper">
+  <select id="find" resultType="com.travel.domain.AiPlanRecord">SELECT * FROM `ai_plan_record` WHERE `ai_plan_id` = #{id}</select>
+  <select id="lock" resultType="com.travel.domain.AiPlanRecord">SELECT * FROM `ai_plan_record` WHERE `ai_plan_id` = #{id} FOR UPDATE</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="aiPlanId">
+    INSERT INTO `ai_plan_record` (`user_id`, `trip_id`, `request_json`, `response_json`, `estimated_total`, `status`, `error_message`, `saved_at`)
+    VALUES (#{userId}, #{tripId}, #{requestJson}, #{responseJson}, #{estimatedTotal}, #{status}, #{errorMessage}, #{savedAt})
+  </insert>
+  <update id="update">UPDATE `ai_plan_record` SET `user_id` = #{userId}, `trip_id` = #{tripId}, `request_json` = #{requestJson}, `response_json` = #{responseJson}, `estimated_total` = #{estimatedTotal}, `status` = #{status}, `error_message` = #{errorMessage}, `saved_at` = #{savedAt} WHERE `ai_plan_id` = #{aiPlanId}</update>
+  <delete id="delete">DELETE FROM `ai_plan_record` WHERE `ai_plan_id` = #{id}</delete>
+</mapper>

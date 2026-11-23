@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.ItineraryItemMapper">
+  <select id="find" resultType="com.travel.domain.ItineraryItem">SELECT * FROM `itinerary_item` WHERE `item_id` = #{id}</select>
+  <select id="lock" resultType="com.travel.domain.ItineraryItem">SELECT * FROM `itinerary_item` WHERE `item_id` = #{id} FOR UPDATE</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="itemId">
+    INSERT INTO `itinerary_item` (`day_id`, `attraction_id`, `item_name`, `start_time`, `end_time`, `sort_order`, `transportation`, `estimated_cost`, `source_type`, `note`)
+    VALUES (#{dayId}, #{attractionId}, #{itemName}, #{startTime}, #{endTime}, #{sortOrder}, #{transportation}, #{estimatedCost}, #{sourceType}, #{note})
+  </insert>
+  <update id="update">UPDATE `itinerary_item` SET `day_id` = #{dayId}, `attraction_id` = #{attractionId}, `item_name` = #{itemName}, `start_time` = #{startTime}, `end_time` = #{endTime}, `sort_order` = #{sortOrder}, `transportation` = #{transportation}, `estimated_cost` = #{estimatedCost}, `source_type` = #{sourceType}, `note` = #{note} WHERE `item_id` = #{itemId}</update>
+  <delete id="delete">DELETE FROM `itinerary_item` WHERE `item_id` = #{id}</delete>
+</mapper>

@@ -1,0 +1,114 @@
+@baseUrl = http://localhost:8080
+@aiPlanId = 5
+@token = 登录后临时粘贴accessToken，提交前恢复此占位符
+@tripId = 9
+
+### 健康检查
+GET {{baseUrl}}/health
+
+### 数据库就绪检查（无需Token；连接或关键表异常返回503）
+GET {{baseUrl}}/health/ready
+
+### 注册
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{"username":"new_user","password":"Test@123456","confirmPassword":"Test@123456","nickname":"旅行者"}
+
+### 登录
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{"username":"demo_zhang","password":"Test@123456"}
+
+### 我的旅行
+GET {{baseUrl}}/api/trips?page=1&size=10
+Authorization: Bearer {{token}}
+
+### 创建旅行
+POST {{baseUrl}}/api/trips
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"title":"重庆三日游","destination":"重庆","startDate":"2026-12-01","endDate":"2026-12-03","totalBudget":1500}
+
+### 查看每日行程（空白日期也会返回）
+GET {{baseUrl}}/api/trips/{{tripId}}/days
+Authorization: Bearer {{token}}
+
+### 新增行程
+POST {{baseUrl}}/api/trips/{{tripId}}/days/2026-12-01/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"itemName":"午餐","startTime":"12:00","endTime":"13:00","sortOrder":1,"estimatedCost":65}
+
+### 新增真实消费
+POST {{baseUrl}}/api/trips/{{tripId}}/expenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"category":"FOOD","amount":65,"spentOn":"2026-12-01","description":"午餐"}
+
+### 统计
+GET {{baseUrl}}/api/statistics/overview
+Authorization: Bearer {{token}}
+
+### 高德实时搜索（需要AMAP_KEY）
+GET {{baseUrl}}/api/pois/search?keywords=博物馆&region=重庆市&page=1&size=10
+Authorization: Bearer {{token}}
+
+### AI 草稿（需要AI_API_KEY）
+POST {{baseUrl}}/api/ai/plans
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"tripId":"{{tripId}}","destination":"重庆","startDate":"2026-12-01","endDate":"2026-12-03","travelDays":3,"totalBudget":1500,"preferences":["美食"],"requirements":"安排一些休息时间"}
+
+### 读取 AI 草稿并准备保存（先运行；aiPlanId 对应生成结果的方案ID）
+GET {{baseUrl}}/api/ai/plans/{{aiPlanId}}
+Authorization: Bearer {{token}}
+
+> {%
+    // Reuse a generated draft without another model request.
+    client.global.clear("aiSavePlanId");
+    client.global.clear("aiSaveTripId");
+    client.global.clear("aiSaveDaysJson");
+    client.assert(response.status === 200 && response.body.code === 0, "读取 AI 草稿失败");
+    const plan = response.body.data;
+    client.assert(plan.status === "DRAFT", "该方案必须为未保存的 DRAFT");
+    client.assert(plan.tripId != null, "该示例需要先生成绑定旅行的草稿");
+    client.assert(Array.isArray(plan.days) && plan.days.length > 0, "草稿缺少每日行程");
+    client.global.set("aiSavePlanId", String(plan.aiPlanId));
+    client.global.set("aiSaveTripId", String(plan.tripId));
+    client.global.set("aiSaveDaysJson", JSON.stringify(plan.days));
+%}
+
+### 确认保存 AI 行程（读取草稿后运行；已有行程时默认返回409，避免直接覆盖）
+# 如果返回409且确认要替换该旅行的全部活动，再把 confirmOverwrite 改为 true 后重试。
+# 替换仅影响行程活动，消费记录保留。成功保存后不要重复发送此请求。
+POST {{baseUrl}}/api/ai/plans/{{aiSavePlanId}}/save
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tripId": "{{aiSaveTripId}}",
+  "confirmOverwrite": false,
+  "days": {{aiSaveDaysJson}}
+}
+
+### 查询 AI 保存后的正式行程
+GET {{baseUrl}}/api/trips/{{aiSaveTripId}}/days
+Authorization: Bearer {{token}}
+
+### 真实 AI 保存验收结果（方案6已保存，直接查看即可）
+GET {{baseUrl}}/api/ai/plans/6
+Authorization: Bearer {{token}}
+
+### 真实 AI 验收旅行10的正式行程（3天9项活动）
+GET {{baseUrl}}/api/trips/10/days
+Authorization: Bearer {{token}}
+
+### 真实 AI 验收旅行10的预算（12.34元为标记过的验收模拟消费）
+GET {{baseUrl}}/api/trips/10/budget-summary
+Authorization: Bearer {{token}}

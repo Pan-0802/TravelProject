@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.ReadMapper">
+  <sql id="tripWhere">
+    WHERE t.user_id = #{filter.userId}
+    <if test="filter.keyword != null and filter.keyword != ''">
+      AND (LOCATE(#{filter.keyword}, t.title) &gt; 0 OR LOCATE(#{filter.keyword}, t.destination) &gt; 0)
+    </if>
+    <choose>
+      <when test="filter.status == 'NOT_STARTED'">AND t.start_date &gt; #{filter.today}</when>
+      <when test="filter.status == 'FINISHED'">AND t.end_date &lt; #{filter.today}</when>
+      <when test="filter.status == 'ONGOING'">AND t.start_date &lt;= #{filter.today} AND t.end_date &gt;= #{filter.today}</when>
+    </choose>
+  </sql>
+  <select id="countTrips" resultType="long">
+    SELECT COUNT(*) FROM trip t <include refid="tripWhere"/>
+  </select>
+  <select id="trips" resultType="com.travel.dto.ReadModels$TripRow">
+    SELECT t.*, COALESCE(e.actual_expense, 0) AS actual_expense FROM trip t
+    LEFT JOIN (
+      SELECT ex.trip_id, SUM(ex.amount) AS actual_expense FROM expense ex
+      JOIN trip owned ON owned.trip_id = ex.trip_id WHERE owned.user_id = #{filter.userId}
+      GROUP BY ex.trip_id
+    ) e ON e.trip_id = t.trip_id
+    <include refid="tripWhere"/>
+    ORDER BY t.created_at DESC, t.trip_id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <sql id="attractionFrom">
+    FROM attraction a LEFT JOIN favorite f ON f.attraction_id = a.attraction_id AND f.user_id = #{filter.userId}
+    WHERE 1=1
+    <if test="filter.mineOnly">AND a.created_by = #{filter.userId}</if>
+    <if test="filter.favoritesOnly">AND f.favorite_id IS NOT NULL</if>
+    <if test="filter.keyword != null and filter.keyword != ''">AND LOCATE(#{filter.keyword}, a.name) &gt; 0</if>
+    <if test="filter.city != null">AND a.city = #{filter.city}</if>
+  </sql>
+  <select id="countAttractions" resultType="long">SELECT COUNT(*) <include refid="attractionFrom"/></select>
+  <select id="attractions" resultType="com.travel.dto.ReadModels$AttractionRow">
+    SELECT a.*, CASE WHEN f.favorite_id IS NULL THEN FALSE ELSE TRUE END AS favorited,
+      f.favorite_id, f.created_at AS favorite_created_at
+    <include refid="attractionFrom"/>
+    <choose>
+      <when test="filter.favoritesOnly">ORDER BY f.created_at DESC, f.favorite_id DESC</when>
+      <otherwise>ORDER BY a.created_at DESC, a.attraction_id DESC</otherwise>
+    </choose>
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <sql id="expenseWhere">
+    WHERE trip_id = #{filter.tripId}
+    <if test="filter.category != null">AND category = #{filter.category}</if>
+    <if test="filter.startDate != null">AND spent_on &gt;= #{filter.startDate}</if>
+    <if test="filter.endDate != null">AND spent_on &lt;= #{filter.endDate}</if>
+  </sql>
+  <select id="countExpenses" resultType="long">SELECT COUNT(*) FROM expense <include refid="expenseWhere"/></select>
+  <select id="expenses" resultType="com.travel.domain.Expense">
+    SELECT * FROM expense <include refid="expenseWhere"/>
+    ORDER BY spent_on DESC, expense_id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <sql id="planWhere">WHERE user_id = #{userId}<if test="status != null"> AND status = #{status}</if></sql>
+  <select id="countPlans" resultType="long">SELECT COUNT(*) FROM ai_plan_record <include refid="planWhere"/></select>
+  <select id="plans" resultType="com.travel.domain.AiPlanRecord">
+    SELECT ai_plan_id, user_id, trip_id, request_json, estimated_total, status, error_message, created_at, saved_at
+    FROM ai_plan_record <include refid="planWhere"/>
+    ORDER BY created_at DESC, ai_plan_id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="overview" resultType="com.travel.dto.ReadModels$Overview">
+    SELECT COUNT(*) AS total_trips,
+      COALESCE(SUM(TIMESTAMPDIFF(DAY, t.start_date, t.end_date) + 1), 0) AS total_travel_days,
+      COALESCE(SUM(t.total_budget), 0) AS total_budget,
+      COALESCE(SUM(CASE WHEN t.start_date &lt;= #{today} AND t.end_date &gt;= #{today} THEN 1 ELSE 0 END), 0) AS ongoing_trips,
+      COALESCE(SUM(CASE WHEN t.end_date &lt; #{today} THEN 1 ELSE 0 END), 0) AS finished_trips,
+      COALESCE(SUM(CASE WHEN t.start_date &gt; #{today} THEN 1 ELSE 0 END), 0) AS upcoming_trips,
+      (SELECT COALESCE(SUM(e.amount), 0) FROM expense e JOIN trip owned ON owned.trip_id = e.trip_id
+       WHERE owned.user_id = #{userId}) AS total_actual_expense
+    FROM trip t WHERE t.user_id = #{userId}
+  </select>
+  <select id="categories" resultType="com.travel.dto.ReadModels$CategoryTotal">
+    SELECT e.category, SUM(e.amount) AS amount FROM expense e JOIN trip t ON t.trip_id = e.trip_id
+    WHERE t.user_id = #{userId}<if test="tripId != null"> AND t.trip_id = #{tripId}</if>
+    GROUP BY e.category ORDER BY e.category
+  </select>
+  <select id="tripItems" resultType="com.travel.domain.ItineraryItem">
+    SELECT i.* FROM itinerary_item i JOIN trip_day d ON d.day_id = i.day_id
+    WHERE d.trip_id = #{tripId} ORDER BY d.trip_date, i.sort_order, i.item_id
+  </select>
+</mapper>
