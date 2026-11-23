@@ -30,8 +30,8 @@ test('选项超过50条仍能关联第51条旅行', async ({ page }) => {
     return route.fulfill({ json: envelope({ list, total: 51, page: pageNumber, size: 50 }) })
   })
   await page.goto('/ai?tripId=951')
-  await expect(page.getByPlaceholder('例如：重庆', { exact: true })).toHaveValue('重庆')
-  await expect(page.locator('.ai-form-card .el-select').first()).toContainText('旅行951')
+  await expect(page.locator('.chat-body')).toContainText('旅行951')
+  await expect(page.locator('.chat-chips').first()).toBeVisible()
   expect(pages).toEqual([1, 2])
 })
 

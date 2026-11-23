@@ -160,10 +160,30 @@ async function savePassword() {
 
 <style scoped>
 .profile-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+/* 三张卡片等宽等高：flex 拉伸保证上边界、下边界都对齐 */
+.profile-grid > .tp-card {
+  flex: 1 1 0;
+  min-width: 340px;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 内容顶部对齐，按钮固定在卡片底部，视觉上更整齐 */
+.profile-grid > .tp-card > .el-form {
+  margin-top: auto;
+}
+
+.profile-grid .card-title {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
 }
 
 .card-title {

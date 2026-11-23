@@ -70,6 +70,10 @@ export const PREFERENCE_OPTIONS = [
   '小众路线'
 ]
 
+/** 全国省市数据统一从 regions.ts 导出（下拉显示「xx省xx市」） */
+export { CITY_GROUPS, CITY_OPTIONS, CITY_VALUE_SET, HOT_CITY_OPTIONS, PROVINCE_CITIES } from './regions'
+export type { CityGroup, CityOption } from './regions'
+
 /** 通用分页默认值（契约：size 默认 10，最大 50） */
 export const DEFAULT_PAGE_SIZE = 10
 export const MAX_PAGE_SIZE = 50

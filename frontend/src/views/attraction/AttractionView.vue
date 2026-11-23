@@ -30,13 +30,7 @@
           :prefix-icon="Search"
           @keyup.enter="searchPoi"
         />
-        <el-input
-          v-model.trim="poiQuery.region"
-          placeholder="城市，如：重庆市"
-          clearable
-          style="width: 180px"
-          @keyup.enter="searchPoi"
-        />
+        <CityCascader v-model="poiQuery.region" placeholder="选择省市" width="200px" @change="searchPoi" />
         <el-switch v-model="poiQuery.cityLimit" active-text="仅限本市" />
         <el-button type="primary" :loading="poiLoading" @click="searchPoi">搜索</el-button>
       </div>
@@ -91,14 +85,7 @@
           @keyup.enter="handleAttrSearch"
           @clear="handleAttrSearch"
         />
-        <el-input
-          v-model.trim="attrQuery.city"
-          placeholder="按城市筛选"
-          clearable
-          style="width: 160px"
-          @keyup.enter="handleAttrSearch"
-          @clear="handleAttrSearch"
-        />
+        <CityCascader v-model="attrQuery.city" placeholder="按省市筛选" width="200px" @change="handleAttrSearch" />
         <el-switch v-model="attrQuery.mineOnly" active-text="只看我创建的" @change="handleAttrSearch" />
         <el-button @click="handleAttrSearch">查询</el-button>
         <el-button text @click="resetAttrQuery">重置</el-button>
@@ -177,6 +164,7 @@ import { Clock, Location, Plus, Refresh, Search, Ticket } from '@element-plus/ic
 import { attractionApi } from '@/api/attraction'
 import { favoriteApi } from '@/api/favorite'
 import { poiApi } from '@/api/poi'
+import CityCascader from '@/components/common/CityCascader.vue'
 import AttractionDetailDialog from '@/components/attraction/AttractionDetailDialog.vue'
 import AttractionFormDialog from '@/components/attraction/AttractionFormDialog.vue'
 import type { Attraction, AttractionPayload, PoiItem } from '@/types/api'

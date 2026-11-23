@@ -110,12 +110,19 @@ test.describe.serial('真实前后端联调', () => {
   test('真实AI生成、编辑、覆盖确认、保存与费用隔离', async ({ page, request }) => {
     await login(page)
     await page.goto(`/ai?tripId=${tripId}`)
-    await page.getByPlaceholder('例如：行程不要太赶，安排一些休息时间').fill('仅安排2个活动，用于课程联调验收。')
+    // 对话式流程：自动选中该旅行 → 交通方式 → 预算 → 偏好 → 附加要求 → 生成
+    await page.locator('.chat-chips .el-check-tag', { hasText: '公共交通' }).first().click()
+    await page.locator('.chat-chips .el-check-tag').first().click()
+    await page.getByRole('button', { name: '确定' }).click()
+    await page.getByPlaceholder(/还有什么要求/).fill('仅安排2个活动，用于课程联调验收。')
+    await page.getByRole('button', { name: '确定' }).click()
     const generated = page.waitForResponse(r => r.url().endsWith('/api/ai/plans') && r.request().method() === 'POST', { timeout: 95000 })
-    await page.getByRole('button', { name: /生成/ }).click()
+    await page.getByRole('button', { name: '开始生成方案' }).click()
     const body = await (await generated).json()
     expect(body.code, body.message).toBe(0)
     planId = body.data.aiPlanId
+    await expect(page.locator('.plan-table')).toBeVisible()
+    await page.getByRole('button', { name: '编辑并保存行程' }).click()
     await expect(page).toHaveURL(new RegExp(`/ai/result/${planId}$`))
     await expect(page.getByPlaceholder('活动名称（必填）').first()).toBeVisible()
     await page.getByPlaceholder('活动名称（必填）').first().fill('AI验收编辑后的活动')

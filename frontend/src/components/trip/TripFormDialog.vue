@@ -14,7 +14,7 @@
       </el-form-item>
 
       <el-form-item label="目的地" prop="destination">
-        <el-input v-model.trim="form.destination" maxlength="120" placeholder="例如：重庆" />
+        <CitySelect v-model="form.destination" placeholder="请选择目的地城市" />
       </el-form-item>
 
       <el-form-item label="出行日期" prop="dateRange">
@@ -63,6 +63,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { tripApi } from '@/api/trip'
+import CitySelect from '@/components/common/CitySelect.vue'
 import type { Trip, TripPayload } from '@/types/api'
 import { daysBetween } from '@/utils/format'
 

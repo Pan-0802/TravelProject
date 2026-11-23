@@ -22,7 +22,7 @@
       </el-form-item>
 
       <el-form-item label="所在城市" prop="city">
-        <el-input v-model.trim="form.city" maxlength="80" placeholder="例如：重庆" />
+        <CityCascader v-model="form.city" placeholder="先选省，再选市" />
       </el-form-item>
 
       <el-form-item label="分类" prop="category">
@@ -78,6 +78,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { attractionApi } from '@/api/attraction'
+import CityCascader from '@/components/common/CityCascader.vue'
 import type { Attraction, AttractionPayload } from '@/types/api'
 
 const props = defineProps<{

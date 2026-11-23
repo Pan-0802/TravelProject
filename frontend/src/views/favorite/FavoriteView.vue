@@ -19,14 +19,7 @@
           @keyup.enter="handleSearch"
           @clear="handleSearch"
         />
-        <el-input
-          v-model.trim="query.city"
-          placeholder="按城市筛选"
-          clearable
-          style="width: 160px"
-          @keyup.enter="handleSearch"
-          @clear="handleSearch"
-        />
+        <CitySelect v-model="query.city" placeholder="按城市筛选" width="180px" @change="handleSearch" />
         <el-button @click="handleSearch">查询</el-button>
         <el-button text @click="handleReset">重置</el-button>
         <div class="tp-toolbar__spacer"></div>
@@ -97,6 +90,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, Location, Refresh, Search, Ticket } from '@element-plus/icons-vue'
 import { favoriteApi } from '@/api/favorite'
+import CitySelect from '@/components/common/CitySelect.vue'
 import AttractionDetailDialog from '@/components/attraction/AttractionDetailDialog.vue'
 import type { Attraction, FavoriteItem } from '@/types/api'
 import { dateTime, durationText, money } from '@/utils/format'
