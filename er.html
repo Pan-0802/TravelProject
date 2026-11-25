@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>个人旅行记录与智能规划系统｜总 E-R 图</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
+
+        .toolbar {
+            width: 1440px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            background: #374151;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #1f2937;
+        }
+
+        .btn.secondary {
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #9ca3af;
+        }
+
+        .btn.secondary:hover {
+            background: #f9fafb;
+        }
+
+        .canvas-container {
+            width: 1440px;
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        svg {
+            display: block;
+            width: 1440px;
+            height: 1020px;
+        }
+
+        /* 标题与图例 */
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            fill: #111827;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            fill: #4b5563;
+        }
+
+        .legend-bg {
+            fill: #ffffff;
+            stroke: #6b7280;
+            stroke-width: 1.2;
+        }
+
+        .legend-text {
+            font-size: 12.5px;
+            fill: #374151;
+        }
+
+        /* 经典 Chen 实体与联系 */
+        .entity-box {
+            fill: #ffffff;
+            stroke: #4b5563;
+            stroke-width: 1.8;
+        }
+
+        .entity-cn {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #111827;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        .entity-en {
+            font-size: 12px;
+            font-weight: 500;
+            fill: #374151;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        .rel-diamond {
+            fill: #ffffff;
+            stroke: #4b5563;
+            stroke-width: 1.8;
+        }
+
+        .rel-text {
+            font-size: 13.5px;
+            font-weight: 500;
+            fill: #111827;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* 实线连接 */
+        .conn-line {
+            stroke: #4b5563;
+            stroke-width: 1.6;
+            fill: none;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+
+        /* 基数文字 */
+        .card-text {
+            font-size: 14px;
+            font-weight: 500;
+            fill: #374151;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* 底部实体属性一览 */
+        .attr-section-title {
+            font-size: 15.5px;
+            font-weight: 700;
+            fill: #111827;
+        }
+
+        .attr-card {
+            fill: #ffffff;
+            stroke: #9ca3af;
+            stroke-width: 1.2;
+        }
+
+        .attr-header {
+            font-size: 13.5px;
+            font-weight: 700;
+            fill: #111827;
+        }
+
+        .attr-pk {
+            font-size: 12px;
+            fill: #1f2937;
+        }
+
+        .attr-pk-underline {
+            text-decoration: underline;
+            font-weight: 600;
+            fill: #111827;
+        }
+
+        .attr-line {
+            font-size: 12px;
+            fill: #4b5563;
+        }
+
+        .footer-note {
+            font-size: 12px;
+            fill: #6b7280;
+        }
+
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+
+            .toolbar {
+                display: none;
+            }
+
+            .canvas-container {
+                border: none;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <div class="canvas-container">
+        <svg id="erSvg" width="1440" height="1020" viewBox="0 0 1440 1020" xmlns="http://www.w3.org/2000/svg">
+            <rect width="1440" height="1020" fill="#ffffff" />
+
+            <!-- 标题区 -->
+            <text x="44" y="50" class="title">个人旅行记录与智能规划系统｜总 E-R 图</text>
+            <text x="44" y="75" class="subtitle">8 个实体（对应 8 张核心表） · 10 组实体联系</text>
+
+            <!-- 右上角图例区 -->
+            <rect x="1024" y="26" width="372" height="62" class="legend-bg" />
+            <rect x="1040" y="39" width="22" height="14" class="entity-box" />
+            <text x="1069" y="46" class="legend-text">实体</text>
+
+            <polygon points="1124,38 1136,46 1124,54 1112,46" class="rel-diamond" />
+            <text x="1144" y="46" class="legend-text">联系</text>
+
+            <text x="1198" y="46" class="legend-text">1 / n = 基数</text>
+            <text x="1286" y="46" class="legend-text">
+                <tspan style="text-decoration:underline;font-weight:600;">主键</tspan> · FK 外键
+            </text>
+            <text x="1040" y="73" class="legend-text">矩形 = 实体 菱形 = 联系 实线 = 实体联系（? 为可空）</text>
+
+            <!-- ================= 1. 连线层（全部实线，两处改为斜线） ================= -->
+            <!-- 1) user [1] --- 发起 --- [n] ai_plan_record -->
+            <polyline points="248,160 248,105 656,105" class="conn-line" />
+            <polyline points="744,105 1176,105 1176,160" class="conn-line" />
+
+            <!-- 2) user [1] --- 创建 --- [n] trip -->
+            <line x1="336" y1="186" x2="428" y2="186" class="conn-line" />
+            <line x1="520" y1="186" x2="612" y2="186" class="conn-line" />
+
+            <!-- 3) trip [1] --- 关联 (可选) --- [n] ai_plan_record -->
+            <line x1="788" y1="186" x2="878" y2="186" class="conn-line" />
+            <line x1="994" y1="186" x2="1084" y2="186" class="conn-line" />
+
+            <!-- 4) user [1] --- 录入 --- [n] attraction -->
+            <line x1="248" y1="212" x2="248" y2="267" class="conn-line" />
+            <line x1="248" y1="315" x2="248" y2="370" class="conn-line" />
+
+            <!-- 5) user [1] --- 拥有 --- [n] favorite -->
+            <polyline points="160,186 76,186 76,372" class="conn-line" />
+            <polyline points="76,420 76,606 160,606" class="conn-line" />
+
+            <!-- 6) attraction [1] --- 被收藏 --- [n] favorite -->
+            <line x1="248" y1="422" x2="248" y2="477" class="conn-line" />
+            <line x1="248" y1="525" x2="248" y2="580" class="conn-line" />
+
+            <!-- 7) attraction [1] --- 可选引用 --- [n] itinerary_item（斜线） -->
+            <line x1="336" y1="412" x2="426" y2="501" class="conn-line" />
+            <line x1="522" y1="501" x2="612" y2="592" class="conn-line" />
+
+            <!-- 8) trip [1] --- 包含 --- [n] trip_day -->
+            <line x1="700" y1="212" x2="700" y2="267" class="conn-line" />
+            <line x1="700" y1="315" x2="700" y2="370" class="conn-line" />
+
+            <!-- 9) trip_day [1] --- 安排 --- [n] itinerary_item -->
+            <line x1="700" y1="422" x2="700" y2="477" class="conn-line" />
+            <line x1="700" y1="525" x2="700" y2="580" class="conn-line" />
+
+            <!-- 10) trip [1] --- 记录 --- [n] expense（斜线） -->
+            <line x1="788" y1="205" x2="892" y2="291" class="conn-line" />
+            <line x1="980" y1="291" x2="1084" y2="380" class="conn-line" />
+
+            <!-- ================= 2. 8 个实体矩形 ================= -->
+            <rect x="160" y="160" width="176" height="52" class="entity-box" />
+            <text x="248" y="178" class="entity-cn">用户</text>
+            <text x="248" y="197" class="entity-en">user</text>
+
+            <rect x="612" y="160" width="176" height="52" class="entity-box" />
+            <text x="700" y="178" class="entity-cn">旅行计划</text>
+            <text x="700" y="197" class="entity-en">trip</text>
+
+            <rect x="1084" y="160" width="184" height="52" class="entity-box" />
+            <text x="1176" y="178" class="entity-cn">AI规划</text>
+            <text x="1176" y="197" class="entity-en">ai_plan_record</text>
+
+            <rect x="160" y="370" width="176" height="52" class="entity-box" />
+            <text x="248" y="388" class="entity-cn">自建景点</text>
+            <text x="248" y="407" class="entity-en">attraction</text>
+
+            <rect x="612" y="370" width="176" height="52" class="entity-box" />
+            <text x="700" y="388" class="entity-cn">每日行程</text>
+            <text x="700" y="407" class="entity-en">trip_day</text>
+
+            <rect x="1084" y="370" width="176" height="52" class="entity-box" />
+            <text x="1172" y="388" class="entity-cn">消费记录</text>
+            <text x="1172" y="407" class="entity-en">expense</text>
+
+            <rect x="160" y="580" width="176" height="52" class="entity-box" />
+            <text x="248" y="598" class="entity-cn">收藏记录</text>
+            <text x="248" y="617" class="entity-en">favorite</text>
+
+            <rect x="612" y="580" width="176" height="52" class="entity-box" />
+            <text x="700" y="598" class="entity-cn">行程项目</text>
+            <text x="700" y="617" class="entity-en">itinerary_item</text>
+
+            <!-- ================= 3. 10 个联系菱形 ================= -->
+            <polygon points="700,81 744,105 700,129 656,105" class="rel-diamond" />
+            <text x="700" y="105" class="rel-text">发起</text>
+
+            <polygon points="474,162 520,186 474,210 428,186" class="rel-diamond" />
+            <text x="474" y="186" class="rel-text">创建</text>
+
+            <polygon points="936,162 994,186 936,210 878,186" class="rel-diamond" />
+            <text x="936" y="186" class="rel-text">关联 (可选)</text>
+
+            <polygon points="248,267 292,291 248,315 204,291" class="rel-diamond" />
+            <text x="248" y="291" class="rel-text">录入</text>
+
+            <polygon points="76,372 120,396 76,420 32,396" class="rel-diamond" />
+            <text x="76" y="396" class="rel-text">拥有</text>
+
+            <polygon points="248,477 296,501 248,525 200,501" class="rel-diamond" />
+            <text x="248" y="501" class="rel-text">被收藏</text>
+
+            <polygon points="474,477 522,501 474,525 426,501" class="rel-diamond" />
+            <text x="474" y="501" class="rel-text">可选引用</text>
+
+            <polygon points="700,267 744,291 700,315 656,291" class="rel-diamond" />
+            <text x="700" y="291" class="rel-text">包含</text>
+
+            <polygon points="700,477 744,501 700,525 656,501" class="rel-diamond" />
+            <text x="700" y="501" class="rel-text">安排</text>
+
+            <polygon points="936,267 980,291 936,315 892,291" class="rel-diamond" />
+            <text x="936" y="291" class="rel-text">记录</text>
+
+            <!-- ================= 4. 基数标签（全部避开线条，无重合） ================= -->
+            <!-- 发起: 1 -> n -->
+            <text x="232" y="132" class="card-text">1</text>
+            <text x="1192" y="132" class="card-text">n</text>
+
+            <!-- 创建: 1 -> n -->
+            <text x="382" y="170" class="card-text">1</text>
+            <text x="566" y="170" class="card-text">n</text>
+
+            <!-- 关联 (可选): 1 -> n -->
+            <text x="833" y="170" class="card-text">1</text>
+            <text x="1039" y="170" class="card-text">n</text>
+
+            <!-- 录入: 1 -> n -->
+            <text x="232" y="240" class="card-text">1</text>
+            <text x="232" y="342" class="card-text">n</text>
+
+            <!-- 拥有: 1 -> n -->
+            <text x="118" y="170" class="card-text">1</text>
+            <text x="118" y="590" class="card-text">n</text>
+
+            <!-- 被收藏: 1 -> n -->
+            <text x="232" y="450" class="card-text">1</text>
+            <text x="232" y="552" class="card-text">n</text>
+
+            <!-- 可选引用（斜线）: 1 -> n -->
+            <text x="366" y="462" class="card-text">1</text>
+            <text x="578" y="534" class="card-text">n</text>
+
+            <!-- 包含: 1 -> n -->
+            <text x="684" y="240" class="card-text">1</text>
+            <text x="684" y="342" class="card-text">n</text>
+
+            <!-- 安排: 1 -> n -->
+            <text x="684" y="450" class="card-text">1</text>
+            <text x="684" y="552" class="card-text">n</text>
+
+            <!-- 记录（斜线）: 1 -> n -->
+            <text x="828" y="260" class="card-text">1</text>
+            <text x="1044" y="324" class="card-text">n</text>
+
+            <!-- ================= 5. 底部实体属性一览 ================= -->
+            <text x="44" y="684" class="attr-section-title">实体属性一览（主键下划线；FK 表示外键；带 ? 表示可空）</text>
+
+            <rect x="44" y="700" width="322" height="96" class="attr-card" />
+            <text x="60" y="724" class="attr-header">用户 user</text>
+            <text x="60" y="746" class="attr-pk">主键 <tspan class="attr-pk-underline">user_id</tspan></text>
+            <text x="60" y="766" class="attr-line">username / password_hash</text>
+            <text x="60" y="785" class="attr-line">nickname / created_at</text>
+
+            <rect x="382" y="700" width="322" height="96" class="attr-card" />
+            <text x="398" y="724" class="attr-header">旅行计划 trip</text>
+            <text x="398" y="746" class="attr-pk">主键 <tspan class="attr-pk-underline">trip_id</tspan></text>
+            <text x="398" y="766" class="attr-line">FK user_id / title / destination</text>
+            <text x="398" y="785" class="attr-line">start_date / end_date / total_budget</text>
+
+            <rect x="720" y="700" width="322" height="96" class="attr-card" />
+            <text x="736" y="724" class="attr-header">自建景点 attraction</text>
+            <text x="736" y="746" class="attr-pk">主键 <tspan class="attr-pk-underline">attraction_id</tspan></text>
+            <text x="736" y="766" class="attr-line">FK created_by / name / city</text>
+            <text x="736" y="785" class="attr-line">category / description / reference_ticket_price</text>
+
+            <rect x="1058" y="700" width="338" height="96" class="attr-card" />
+            <text x="1074" y="724" class="attr-header">收藏记录 favorite</text>
+            <text x="1074" y="746" class="attr-pk">主键 <tspan class="attr-pk-underline">favorite_id</tspan></text>
+            <text x="1074" y="766" class="attr-line">FK user_id / FK attraction_id</text>
+            <text x="1074" y="785" class="attr-line">唯一: (user_id, attraction_id)</text>
+
+            <rect x="44" y="812" width="322" height="96" class="attr-card" />
+            <text x="60" y="836" class="attr-header">每日行程 trip_day</text>
+            <text x="60" y="858" class="attr-pk">主键 <tspan class="attr-pk-underline">day_id</tspan></text>
+            <text x="60" y="878" class="attr-line">FK trip_id / trip_date</text>
+            <text x="60" y="897" class="attr-line">唯一: (trip_id, trip_date)</text>
+
+            <rect x="382" y="812" width="322" height="96" class="attr-card" />
+            <text x="398" y="836" class="attr-header">行程项目 itinerary_item</text>
+            <text x="398" y="858" class="attr-pk">主键 <tspan class="attr-pk-underline">item_id</tspan></text>
+            <text x="398" y="878" class="attr-line">FK day_id / FK? attraction_id</text>
+            <text x="398" y="897" class="attr-line">item_name / time / sort_order / estimated_cost</text>
+
+            <rect x="720" y="812" width="322" height="96" class="attr-card" />
+            <text x="736" y="836" class="attr-header">消费记录 expense</text>
+            <text x="736" y="858" class="attr-pk">主键 <tspan class="attr-pk-underline">expense_id</tspan></text>
+            <text x="736" y="878" class="attr-line">FK trip_id / category / amount</text>
+            <text x="736" y="897" class="attr-line">spent_on / description</text>
+
+            <rect x="1058" y="812" width="338" height="96" class="attr-card" />
+            <text x="1074" y="836" class="attr-header">AI规划 ai_plan_record</text>
+            <text x="1074" y="858" class="attr-pk">主键 <tspan class="attr-pk-underline">ai_plan_id</tspan></text>
+            <text x="1074" y="878" class="attr-line">FK user_id / FK? trip_id</text>
+            <text x="1074" y="897" class="attr-line">request_json / response_json / status</text>
+
+            <!-- 底部说明 -->
+            <text x="44" y="948" class="footer-note">提示：高德 POI 为实时查询，不直接建库存储；自建景点为用户独立录入。</text>
+            <text x="1396" y="948" class="footer-note" text-anchor="end">同一个 user / trip 在整张图中只出现一次。</text>
+        </svg>
+    </div>
+
+    <script>
+        function exportPNG() {
+            const svg = document.getElementById("erSvg");
+            const serializer = new XMLSerializer();
+            const svgStr = serializer.serializeToString(svg);
+            const scale = 2;
+            const canvas = document.createElement("canvas");
+            canvas.width = 1440 * scale;
+            canvas.height = 1020 * scale;
+            const ctx = canvas.getContext("2d");
+
+            const img = new Image();
+            const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            img.onload = function () {
+                ctx.scale(scale, scale);
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                const pngUrl = canvas.toDataURL("image/png");
+                const a = document.createElement("a");
+                a.href = pngUrl;
+                a.download = "个人旅行记录与智能规划系统_总ER图.png";
+                a.click();
+            };
+            img.src = url;
+        }
+    </script>
+</body>
+
+</html>
