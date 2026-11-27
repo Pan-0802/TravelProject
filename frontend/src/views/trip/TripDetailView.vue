@@ -21,10 +21,12 @@
 
       <div class="header-actions" v-if="trip">
         <el-button :icon="Edit" @click="editVisible = true">编辑旅行</el-button>
+        <el-button type="danger" plain @click="deleteTrip">删除旅行</el-button>
         <el-button type="primary" :icon="MagicStick" @click="goAiPlanner">用 AI 规划行程</el-button>
       </div>
     </div>
 
+    <RequestError :message="failure" :loading="loading" @retry="refresh" />
     <el-result
       v-if="notFound"
       icon="warning"
@@ -37,7 +39,7 @@
     </el-result>
 
     <template v-else>
-      <div class="stat-grid budget-cards" v-if="trip">
+      <div class="stat-grid budget-cards" v-if="trip && !budgetFailure">
         <div class="stat-card">
           <div class="stat-card__label">总预算</div>
           <div class="stat-card__value">{{ money(trip.totalBudget) }}</div>
@@ -64,19 +66,20 @@
         <el-tabs v-model="activeTab" class="detail-tabs">
           <el-tab-pane label="每日行程" name="itinerary">
             <div class="tab-body">
-              <ItineraryPanel v-if="trip" :trip="trip" />
+              <ItineraryPanel v-if="trip" :trip="trip" @record-expense="recordExpense" />
             </div>
           </el-tab-pane>
 
           <el-tab-pane label="消费记录" name="expense" lazy>
             <div class="tab-body">
-              <ExpensePanel v-if="trip" :trip="trip" @changed="loadBudget" />
+              <ExpensePanel v-if="trip" :key="expenseVersion" :trip="trip" @changed="loadBudget" />
             </div>
           </el-tab-pane>
 
           <el-tab-pane label="预算统计" name="budget" lazy>
             <div class="tab-body">
-              <TripBudgetPanel v-if="trip" :trip="trip" :summary="budget" :loading="budgetLoading" />
+              <RequestError :message="budgetFailure" :loading="budgetLoading" @retry="loadBudget"/>
+              <TripBudgetPanel v-if="trip && !budgetFailure" :trip="trip" :summary="budget" :loading="budgetLoading" />
             </div>
           </el-tab-pane>
         </el-tabs>
@@ -84,6 +87,8 @@
     </template>
 
     <TripFormDialog v-if="trip" v-model="editVisible" :trip="trip" @saved="handleSaved" />
+    <ExpenseDetailDialog v-if="trip" v-model="expenseDetailVisible" :expense="newExpense" :trip="trip" @changed="expenseChanged"/>
+    <ExpenseFormDialog v-if="trip" v-model="expenseVisible" :trip="trip" :prefill="expenseSeed" @saved="expenseSaved"/>
   </div>
 </template>
 
@@ -97,10 +102,14 @@ import ItineraryPanel from '@/components/itinerary/ItineraryPanel.vue'
 import ExpensePanel from '@/components/expense/ExpensePanel.vue'
 import TripBudgetPanel from '@/components/trip/TripBudgetPanel.vue'
 import TripFormDialog from '@/components/trip/TripFormDialog.vue'
+import ExpenseFormDialog from '@/components/expense/ExpenseFormDialog.vue'
+import ExpenseDetailDialog from '@/components/expense/ExpenseDetailDialog.vue'
 import { TRIP_STATUS_LABELS, TRIP_STATUS_TAG_TYPE } from '@/constants'
-import type { BudgetSummary, Trip, TripStatus } from '@/types/api'
+import type { BudgetSummary, Trip, TripStatus, ItineraryItem, Expense } from '@/types/api'
 import { dateRange, money } from '@/utils/format'
-import { errorCode } from '@/utils/request'
+import { errorCode, errorMessage } from '@/utils/request'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import RequestError from '@/components/common/RequestError.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,9 +118,16 @@ const trip = ref<Trip | null>(null)
 const budget = ref<BudgetSummary | null>(null)
 const loading = ref(false)
 const budgetLoading = ref(false)
+const budgetFailure=ref('')
 const notFound = ref(false)
+const failure=ref('')
 const editVisible = ref(false)
 const activeTab = ref<'itinerary' | 'expense' | 'budget'>('itinerary')
+const expenseVisible=ref(false),expenseVersion=ref(0),expenseSeed=ref<{spentOn:string;description:string}>()
+function recordExpense(date:string,item:ItineraryItem){expenseSeed.value={spentOn:date,description:item.itemName};expenseVisible.value=true}
+const newExpense=ref<Expense|null>(null),expenseDetailVisible=ref(false)
+function expenseSaved(expense:Expense,created:boolean){expenseVersion.value++;loadBudget();activeTab.value='expense';if(created){newExpense.value=expense;expenseDetailVisible.value=true}}
+function expenseChanged(){expenseVersion.value++;loadBudget()}
 
 const tripId = computed(() => String(route.params.tripId || ''))
 
@@ -132,13 +148,14 @@ function statusTagType(status: TripStatus) {
 async function loadTrip() {
   loading.value = true
   notFound.value = false
+  failure.value = ''
   try {
     trip.value = await tripApi.detail(tripId.value)
   } catch (error) {
     if (errorCode(error) === 40400 || (error as { status?: number }).status === 404) {
       notFound.value = true
       trip.value = null
-    }
+    } else { failure.value=errorMessage(error) }
   } finally {
     loading.value = false
   }
@@ -147,20 +164,23 @@ async function loadTrip() {
 async function loadBudget() {
   if (!tripId.value) return
   budgetLoading.value = true
+  budgetFailure.value=''
   try {
     budget.value = await expenseApi.budgetSummary(tripId.value)
-  } catch {
-    budget.value = null
+  } catch(e) {
+    budgetFailure.value=errorMessage(e)
   } finally {
     budgetLoading.value = false
   }
 }
 
-function handleSaved() {
-  loadTrip()
-  loadBudget()
-}
+function handleSaved() { router.push('/trips') }
 
+async function deleteTrip() {
+  if(!trip.value)return
+  try{await ElMessageBox.confirm(`删除「${trip.value.title}」后，每日行程与消费记录会一并删除，且无法恢复。确定继续吗？`,'删除旅行',{confirmButtonText:'删除',cancelButtonText:'取消',type:'warning'})}catch{return}
+  try{await tripApi.remove(trip.value.tripId);ElMessage.success('旅行已删除');router.replace('/trips')}catch(e){failure.value=errorMessage(e)}
+}
 function goAiPlanner() {
   router.push({ path: '/ai', query: { tripId: trip.value?.tripId } })
 }
@@ -176,45 +196,45 @@ onMounted(refresh)
 
 <style scoped>
 .back-btn {
-  margin-bottom: 6px;
-  padding-left: 0;
+  margin-bottom:4px;
+  padding-left:0;
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
 .page-subtitle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap:4px;
   flex-wrap: wrap;
 }
 
 .dot {
-  color: #c3ccda;
+  color:#c3ccda;
 }
 
 .status-tag {
-  margin-left: 4px;
+  margin-left:4px;
 }
 
 .budget-cards {
-  margin-bottom: 16px;
+  margin-bottom:16px;
 }
 
 .tabs-card {
-  padding: 6px 18px 18px;
+  padding:4px 16px 16px;
 }
 
 .tab-body {
-  padding-top: 6px;
+  padding-top:4px;
 }
 
 .detail-tabs :deep(.el-tabs__header) {
-  margin-bottom: 14px;
+  margin-bottom:12px;
 }
 
 @media (max-width: 768px) {

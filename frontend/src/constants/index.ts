@@ -7,12 +7,12 @@ import type {
 
 /** 6 种固定消费类别（与数据库 CHECK 约束一致） */
 export const EXPENSE_CATEGORIES: Array<{ value: ExpenseCategory; label: string; color: string }> = [
-  { value: 'FOOD', label: '餐饮', color: '#f2a33a' },
+  { value: 'FOOD', label: '餐饮', color: '#404040' },
   { value: 'TRANSPORT', label: '交通', color: '#3f7ef7' },
-  { value: 'HOTEL', label: '住宿', color: '#7c5cf0' },
-  { value: 'TICKET', label: '门票', color: '#2bb673' },
-  { value: 'SHOPPING', label: '购物', color: '#e6483d' },
-  { value: 'OTHER', label: '其他', color: '#8c98a8' }
+  { value: 'HOTEL', label: '住宿', color: '#606060' },
+  { value: 'TICKET', label: '门票', color: '#808080' },
+  { value: 'SHOPPING', label: '购物', color: '#a0a0a0' },
+  { value: 'OTHER', label: '其他', color: '#c0c0c0' }
 ]
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
@@ -32,8 +32,8 @@ export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
 
 export const TRIP_STATUS_TAG_TYPE: Record<TripStatus, 'info' | 'success' | 'warning'> = {
   NOT_STARTED: 'info',
-  ONGOING: 'success',
-  FINISHED: 'warning'
+  ONGOING: 'info',
+  FINISHED: 'info'
 }
 
 export const AI_STATUS_LABELS: Record<AiPlanStatus, string> = {
@@ -74,6 +74,6 @@ export const PREFERENCE_OPTIONS = [
 export { CITY_GROUPS, CITY_OPTIONS, CITY_VALUE_SET, HOT_CITY_OPTIONS, PROVINCE_CITIES } from './regions'
 export type { CityGroup, CityOption } from './regions'
 
-/** 通用分页默认值（契约：size 默认 10，最大 50） */
-export const DEFAULT_PAGE_SIZE = 10
+/** 通用分页默认值（契约：size 默认 20，最大 50） */
+export const DEFAULT_PAGE_SIZE = 20
 export const MAX_PAGE_SIZE = 50

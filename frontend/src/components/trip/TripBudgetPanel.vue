@@ -143,19 +143,19 @@ watch(() => props.summary, renderChart, { deep: true, immediate: true })
 }
 
 .budget-progress {
-  margin: 18px 0 4px;
+  margin:16px 0 4px;
 }
 
 .budget-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
+  gap:16px;
+  margin-top:16px;
 }
 
 .budget-title {
-  margin: 0 0 12px;
-  font-size: 15px;
+  margin:0 0 12px;
+  font-size: var(--tp-font-body);
   font-weight: 600;
 }
 </style>

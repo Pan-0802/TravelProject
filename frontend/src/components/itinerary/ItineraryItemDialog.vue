@@ -2,14 +2,14 @@
   <el-dialog
     :model-value="modelValue"
     :title="isEdit ? '编辑行程项' : `添加行程（${date}）`"
-    width="620px"
+    width="min(620px, 94vw)"
     :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="handleOpen"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
-      <el-form-item label="活动名称" prop="itemName">
+      <el-form-item label="活动名称" prop="itemName" :error="fieldErrors.itemName">
         <el-input v-model.trim="form.itemName" maxlength="150" show-word-limit placeholder="例如：解放碑步行游览" />
       </el-form-item>
 
@@ -32,6 +32,8 @@
           />
           <span class="tp-muted">可留空</span>
         </div>
+        <p class="placement-hint">{{ form.startTime ? '保存后按开始时间自动排入当天行程。' : '不填开始时间时放在当天末尾，补充时间后自动归位。' }}</p>
+        <p v-if="overlapNames.length" class="overlap-hint" role="status">与 {{ overlapNames.join('、') }} 时间重叠，请确认安排；保存不会调整其他活动的时间。</p>
       </el-form-item>
 
       <el-form-item label="关联景点">
@@ -42,6 +44,7 @@
           filterable
           style="width: 100%"
           :loading="attractionLoading"
+          @change="selectAttraction"
         >
           <el-option
             v-for="item in attractions"
@@ -89,6 +92,7 @@
           placeholder="可选，例如：提前确认开放时间"
         />
       </el-form-item>
+      <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" show-icon role="alert" />
     </el-form>
 
     <template #footer>
@@ -99,12 +103,14 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { attractionApi } from '@/api/attraction'
 import { itineraryApi } from '@/api/itinerary'
 import { TRANSPORTATION_OPTIONS } from '@/constants'
 import type { Attraction, ItineraryItem } from '@/types/api'
+import { timeConflicts } from '@/utils/schedule'
 
 const props = defineProps<{
   modelValue: boolean
@@ -112,6 +118,9 @@ const props = defineProps<{
   date: string
   item?: ItineraryItem | null
   nextSortOrder?: number
+  city?: string
+  seed?: Partial<ItineraryItem>
+  dayItems?: ItineraryItem[]
 }>()
 
 const emit = defineEmits<{
@@ -122,6 +131,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => Boolean(props.item?.itemId))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({})
 const attractions = ref<Attraction[]>([])
 const attractionLoading = ref(false)
 
@@ -134,6 +144,7 @@ const form = reactive({
   estimatedCost: 0,
   note: ''
 })
+const overlapNames = computed(() => timeConflicts(form, (props.dayItems || []).filter(item => item.itemId !== props.item?.itemId)))
 
 const rules: FormRules = {
   itemName: [
@@ -154,7 +165,8 @@ async function loadAttractions() {
 }
 
 function handleOpen() {
-  const item = props.item
+  clearErrors()
+  const item = props.item || props.seed
   form.itemName = item?.itemName || ''
   form.startTime = item?.startTime || ''
   form.endTime = item?.endTime || ''
@@ -166,9 +178,22 @@ function handleOpen() {
   loadAttractions()
 }
 
+function selectAttraction(id:string) {
+  const a=attractions.value.find(a=>a.attractionId===id)
+  if(!a) return
+  form.itemName=a.name
+  form.estimatedCost=Number(a.referenceTicketPrice||0)
+  if(form.startTime && a.suggestedDurationMinutes) {
+    const [h,m]=form.startTime.split(':').map(Number),end=h!*60+m!+a.suggestedDurationMinutes
+    if(end<1440) form.endTime=String(Math.floor(end/60)).padStart(2,'0')+':'+String(end%60).padStart(2,'0')
+  }
+}
+
 async function handleSubmit() {
+  if (submitting.value) return
+  clearErrors()
   const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!valid || submitting.value) return
 
   if (form.startTime && form.endTime && form.endTime < form.startTime) {
     ElMessage.warning('结束时间不能早于开始时间')
@@ -203,8 +228,8 @@ async function handleSubmit() {
     }
     emit('saved')
     emit('update:modelValue', false)
-  } catch {
-    // 422（日期越界等）由拦截器提示
+  } catch (error) {
+    showError(error)
   } finally {
     submitting.value = false
   }
@@ -215,7 +240,7 @@ async function handleSubmit() {
 .time-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
@@ -224,8 +249,9 @@ async function handleSubmit() {
 }
 
 .unit {
-  margin-left: 8px;
+  margin-left:8px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
+.placement-hint,.overlap-hint{flex-basis:100%;font-size: var(--tp-font-body);line-height:1.7;margin:4px 0 0;color:var(--tp-text-secondary)}.overlap-hint{color:var(--tp-text-secondary)}
 </style>

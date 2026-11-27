@@ -4,19 +4,18 @@
     element-loading-text="加载行程中…"
     class="itinerary-panel"
   >
+    <RequestError :message="failure" :loading="loading" @retry="loadDays"/>
     <div class="itinerary-panel__toolbar">
       <span class="tp-muted">
-        共 {{ days.length }} 天行程，{{ totalItems }} 个活动。可使用上下箭头调整当天顺序。
+        共 {{ days.length }} 天行程，{{ totalItems }} 个活动。新增或修改开始时间会自动排序，也可用箭头自定义顺序。
       </span>
       <div class="itinerary-panel__actions">
-        <el-button :icon="Guide" text :loading="distanceLoading" @click="computeDistances">
-          {{ distanceComputed ? '重新计算距离' : '计算距离与用时' }}
-        </el-button>
+        <el-button type="primary" plain @click="router.push({path:'/attractions',query:{tripId:trip.tripId}})">挑选景点加入行程</el-button>
         <el-button :icon="Refresh" text @click="loadDays">刷新</el-button>
       </div>
     </div>
 
-    <div v-if="!loading && days.length === 0" class="tp-empty">
+    <div v-if="!failure && !loading && days.length === 0" class="tp-empty">
       暂无行程数据。确认旅行日期范围后再试。
     </div>
 
@@ -25,7 +24,7 @@
       :key="day.date"
       shadow="never"
       class="day-card"
-      :body-style="{ padding: '14px 16px' }"
+      :body-style="{ padding:'12px 16px' }"
     >
       <template #header>
         <div class="day-card__header">
@@ -37,7 +36,8 @@
               {{ day.description }}
             </el-tag>
           </div>
-          <el-button size="small" type="primary" plain :icon="Plus" @click="openAdd(day)">
+          <el-button v-if="needsTimeOrder(sortedItems(day))" size="small" text type="primary" :disabled="reordering" @click="arrangeByTime(day)">按时间整理</el-button>
+          <el-button size="small" type="primary" plain :icon="Plus" :disabled="reordering" @click="openAdd(day)">
             添加行程
           </el-button>
         </div>
@@ -49,21 +49,6 @@
 
       <div v-else class="item-list">
         <template v-for="(item, index) in sortedItems(day)" :key="item.itemId">
-          <div v-if="index > 0" class="item-segment">
-            <template v-if="segmentOf(day, index)">
-              <el-icon><Bottom /></el-icon>
-              <span>{{ segmentText(day, index) }}</span>
-              <span class="item-segment__tip">（直线距离估算，仅供参考）</span>
-            </template>
-            <template v-else-if="distanceComputed">
-              <el-icon><WarningFilled /></el-icon>
-              <span>上一站或本站未取到位置，无法估算距离</span>
-            </template>
-            <template v-else>
-              <span class="item-segment__idle">点击右上角“计算距离与用时”可估算两站之间的距离</span>
-            </template>
-          </div>
-
           <div class="item">
             <div class="item__time">{{ timeRange(item.startTime, item.endTime) }}</div>
 
@@ -73,6 +58,7 @@
                 <el-tag size="small" :type="item.sourceType === 'AI' ? 'success' : 'info'" effect="plain">
                   {{ SOURCE_TYPE_LABELS[item.sourceType] || item.sourceType }}
                 </el-tag>
+                <el-tag v-if="conflicts.get(item.itemId)?.length" size="small" type="warning" effect="plain" :title="'与 '+conflicts.get(item.itemId)!.join('、')+' 时间重叠'">时间重叠</el-tag>
               </div>
               <div class="item__meta">
                 <span v-if="item.transportation">
@@ -102,6 +88,7 @@
               >
                 <el-icon><Bottom /></el-icon>
               </el-button>
+              <el-button text size="small" @click="emit('record-expense',day.date,item)">记消费</el-button>
               <el-button text size="small" type="primary" @click="openEdit(day, item)">编辑</el-button>
               <el-button text size="small" type="danger" @click="handleDelete(item)">删除</el-button>
             </div>
@@ -113,9 +100,11 @@
     <ItineraryItemDialog
       v-model="dialogVisible"
       :trip-id="trip.tripId"
+      :city="trip.destination"
       :date="editingDate"
       :item="editingItem"
       :next-sort-order="nextSortOrder"
+      :day-items="days.find(d=>d.date===editingDate)?.items || []"
       @saved="loadDays"
     />
   </div>
@@ -123,118 +112,37 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import {useRouter} from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bottom, Guide, Plus, Refresh, Top, Van, Wallet, WarningFilled } from '@element-plus/icons-vue'
+import { Bottom, Plus, Refresh, Top, Van, Wallet } from '@element-plus/icons-vue'
 import { itineraryApi } from '@/api/itinerary'
 import ItineraryItemDialog from '@/components/itinerary/ItineraryItemDialog.vue'
 import { SOURCE_TYPE_LABELS } from '@/constants'
 import type { ItineraryItem, Trip, TripDay } from '@/types/api'
-import {
-  estimateMinutes,
-  formatKm,
-  formatMinutes,
-  geocodePlace,
-  haversineKm,
-  type GeoPoint
-} from '@/utils/distance'
 import { longDate, money, timeRange, weekday } from '@/utils/format'
+import { byStartTime, needsTimeOrder, timeConflicts } from '@/utils/schedule'
+import RequestError from '@/components/common/RequestError.vue'
+import {errorMessage} from '@/utils/request'
 
 const props = defineProps<{ trip: Trip }>()
+const router=useRouter()
+const emit=defineEmits<{(e:'record-expense',date:string,item:ItineraryItem):void}>()
 
 const days = ref<TripDay[]>([])
 const loading = ref(false)
+const failure=ref('')
 const reordering = ref(false)
 const dialogVisible = ref(false)
 const editingDate = ref('')
 const editingItem = ref<ItineraryItem | null>(null)
 const nextSortOrder = ref(1)
 
-/** 两站之间的估算结果，key = 日期#到达序号 */
-interface SegmentInfo {
-  km: number
-  minutes: number
-  transportation: string
-}
-
-const segments = ref<Record<string, SegmentInfo>>({})
-const distanceComputed = ref(false)
-const distanceLoading = ref(false)
-
-function segmentOf(day: TripDay, index: number): SegmentInfo | null {
-  return segments.value[`${day.date}#${index}`] || null
-}
-
-function segmentText(day: TripDay, index: number): string {
-  const segment = segmentOf(day, index)
-  if (!segment) return ''
-  if (segment.km < 0.03) return '与上一站基本在同一位置'
-  return `距上一站 ${formatKm(segment.km)} · ${segment.transportation}${formatMinutes(segment.minutes)}`
-}
-
-/** 并发预热坐标缓存，避免一次性打满高德配额 */
-async function warmUpPlaces(names: string[]) {
-  const queue = [...names]
-  const workers = Array.from({ length: 3 }, async () => {
-    while (queue.length) {
-      const name = queue.shift()
-      if (name) await geocodePlace(name, props.trip.destination)
-    }
-  })
-  await Promise.all(workers)
-}
-
-async function computeDistances() {
-  if (distanceLoading.value) return
-  distanceLoading.value = true
-  try {
-    const names = new Set<string>()
-    for (const day of days.value) {
-      for (const item of sortedItems(day)) names.add(item.itemName)
-    }
-    if (names.size === 0) {
-      ElMessage.info('还没有行程项，先添加景点再计算距离')
-      return
-    }
-    await warmUpPlaces([...names])
-
-    const result: Record<string, SegmentInfo> = {}
-    let computed = 0
-    for (const day of days.value) {
-      const items = sortedItems(day)
-      let prevPoint: GeoPoint | null = null
-      let prevItem: ItineraryItem | null = null
-      for (let index = 0; index < items.length; index += 1) {
-        const item = items[index]
-        const point = await geocodePlace(item.itemName, props.trip.destination)
-        if (prevPoint && point) {
-          const km = haversineKm(prevPoint, point)
-          const transportation = item.transportation || prevItem?.transportation || '步行'
-          result[`${day.date}#${index}`] = {
-            km,
-            minutes: estimateMinutes(km, transportation),
-            transportation
-          }
-          computed += 1
-        }
-        prevPoint = point
-        prevItem = item
-      }
-    }
-    segments.value = result
-    distanceComputed.value = true
-    if (computed === 0) {
-      ElMessage.warning('没有取到地点坐标，请确认后端已配置高德 Key')
-    } else {
-      ElMessage.success(`已估算 ${computed} 段路程`)
-    }
-  } finally {
-    distanceLoading.value = false
-  }
-}
-
 const totalItems = computed(() =>
   days.value.reduce((sum, day) => sum + (day.items?.length || 0), 0)
 )
+const conflicts = computed(() => new Map(days.value.flatMap(day => day.items.map(item =>
+  [item.itemId, timeConflicts(item, day.items.filter(other => other.itemId !== item.itemId))] as const
+))))
 
 function sortedItems(day: TripDay): ItineraryItem[] {
   return [...(day.items || [])].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -242,14 +150,12 @@ function sortedItems(day: TripDay): ItineraryItem[] {
 
 async function loadDays() {
   loading.value = true
+  failure.value=''
   try {
     const result = await itineraryApi.days(props.trip.tripId)
     days.value = result.days || []
-    // 行程变化后旧的估算结果失效，需要重新计算
-    segments.value = {}
-    distanceComputed.value = false
-  } catch {
-    days.value = []
+  } catch(e) {
+    failure.value=errorMessage(e)
   } finally {
     loading.value = false
   }
@@ -271,7 +177,7 @@ function openEdit(day: TripDay, item: ItineraryItem) {
 
 async function handleDelete(item: ItineraryItem) {
   try {
-    await ElMessageBox.confirm(`确定删除行程项「${item.itemName}」吗？`, '删除行程', {
+    await ElMessageBox.confirm(`删除行程项「${item.itemName}」后无法恢复；已记录的实际消费会保留。确定删除吗？`, '删除行程', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
@@ -289,6 +195,7 @@ async function handleDelete(item: ItineraryItem) {
 }
 
 async function move(day: TripDay, index: number, offset: number) {
+  if (reordering.value) return
   const items = sortedItems(day)
   const target = index + offset
   if (target < 0 || target >= items.length) return
@@ -314,6 +221,18 @@ async function move(day: TripDay, index: number, offset: number) {
   }
 }
 
+async function arrangeByTime(day: TripDay) {
+  if (reordering.value) return
+  reordering.value = true
+  try {
+    const updated = await itineraryApi.reorder(props.trip.tripId, day.date, byStartTime(sortedItems(day)).map(item => item.itemId))
+    const target = days.value.find(d => d.date === day.date)
+    if (target) target.items = updated
+    ElMessage.success('当天行程已按开始时间整理，活动时间保持不变')
+  } catch { /* Request layer shows errors. */ }
+  finally { reordering.value = false }
+}
+
 watch(() => [props.trip.tripId, props.trip.startDate, props.trip.endDate], loadDays)
 onMounted(loadDays)
 </script>
@@ -323,18 +242,18 @@ onMounted(loadDays)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  gap: 12px;
+  margin-bottom:12px;
+  gap:12px;
 }
 
 .day-card {
   border-radius: 10px;
   border: 1px solid var(--tp-border);
-  margin-bottom: 14px;
+  margin-bottom:12px;
 }
 
 .day-card :deep(.el-card__header) {
-  padding: 12px 16px;
+  padding:12px 16px;
   background: #f8faff;
 }
 
@@ -342,23 +261,23 @@ onMounted(loadDays)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap:12px;
   flex-wrap: wrap;
 }
 
 .day-card__title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
 .day-card__badge {
   background: var(--tp-primary);
-  color: #fff;
+  color:#ffffff;
   border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
+  padding:4px 8px;
+  font-size: var(--tp-font-body);
   font-weight: 600;
 }
 
@@ -367,9 +286,9 @@ onMounted(loadDays)
 }
 
 .day-card__empty {
-  padding: 10px 4px;
+  padding:8px 4px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
 
 .item-list {
@@ -380,28 +299,28 @@ onMounted(loadDays)
 .item {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 12px 4px;
+  gap:12px;
+  padding:12px 4px;
   border-bottom: 1px dashed var(--tp-border);
 }
 
 .itinerary-panel__actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap:4px;
   flex-shrink: 0;
 }
 
 .item-segment {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap:4px;
   flex-wrap: wrap;
-  margin: 2px 0 2px 134px;
-  padding: 4px 10px;
+  margin:4px 0 4px 24px;
+  padding:4px 8px;
   border-left: 2px dashed #c9d8f7;
-  font-size: 12px;
-  color: #5b6b85;
+  font-size: var(--tp-font-body);
+  color:var(--tp-primary);
   background: #f7faff;
   border-radius: 0 6px 6px 0;
 }
@@ -412,16 +331,16 @@ onMounted(loadDays)
 }
 
 .item-segment__tip {
-  color: #9aa7bd;
+  color:var(--tp-text-secondary);
 }
 
 .item-segment__idle {
-  color: #9aa7bd;
+  color:var(--tp-text-secondary);
 }
 
 @media (max-width: 768px) {
   .item-segment {
-    margin-left: 0;
+    margin-left:0;
   }
 }
 
@@ -432,10 +351,10 @@ onMounted(loadDays)
 .item__time {
   width: 120px;
   flex: 0 0 120px;
-  font-size: 13px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
   font-variant-numeric: tabular-nums;
-  padding-top: 2px;
+  padding-top:4px;
 }
 
 .item__main {
@@ -447,24 +366,24 @@ onMounted(loadDays)
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
 .item__meta {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap:12px;
   flex-wrap: wrap;
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top:4px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
 }
 
 .item__meta span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap:4px;
 }
 
 .item__note {
@@ -489,7 +408,7 @@ onMounted(loadDays)
     flex: 1 1 100%;
   }
   .item__actions {
-    margin-left: auto;
+    margin-left:auto;
   }
 }
 </style>

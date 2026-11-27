@@ -15,7 +15,7 @@ export const poiApi = {
       region: params.region,
       cityLimit: params.cityLimit ?? true,
       page: params.page ?? 1,
-      size: params.size ?? 10
+      size: params.size ?? 20
     })
   }
 }

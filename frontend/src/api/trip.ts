@@ -10,7 +10,7 @@ export const tripApi = {
   list(params: TripQuery) {
     return http.get<PageResult<Trip>>('/trips', {
       page: params.page ?? 1,
-      size: params.size ?? 10,
+      size: params.size ?? 20,
       keyword: params.keyword || undefined,
       status: params.status || undefined
     })

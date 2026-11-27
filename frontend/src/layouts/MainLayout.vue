@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -81,7 +81,9 @@ import { useAuthStore } from '@/stores/auth'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const collapsed = ref(false)
+const compactViewport = window.matchMedia('(max-width: 959px)')
+const collapsed = ref(compactViewport.matches)
+function updateViewport(event: MediaQueryListEvent) { if (event.matches) collapsed.value = true }
 const isMock = import.meta.env.VITE_USE_MOCK === 'true'
 
 const menus = [
@@ -117,9 +119,11 @@ async function handleCommand(command: string) {
 }
 
 onMounted(() => {
+  compactViewport.addEventListener('change', updateViewport)
   // 刷新页面后同步一次最新用户资料，失败静默（拦截器会处理 401）
   auth.refreshMe().catch(() => undefined)
 })
+onBeforeUnmount(() => compactViewport.removeEventListener('change', updateViewport))
 </script>
 
 <style scoped>
@@ -129,7 +133,7 @@ onMounted(() => {
 
 .layout__aside {
   background: #1f2a44;
-  color: #fff;
+  color:#ffffff;
   transition: width 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -142,11 +146,11 @@ onMounted(() => {
   height: 60px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 18px;
-  font-size: 16px;
+  gap:8px;
+  padding:0 16px;
+  font-size: var(--tp-font-section);
   font-weight: 600;
-  color: #fff;
+  color:#ffffff;
   letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
@@ -154,7 +158,7 @@ onMounted(() => {
 
 .layout__logo--mini {
   justify-content: center;
-  padding: 0;
+  padding:0;
 }
 
 .layout__menu {
@@ -171,14 +175,14 @@ onMounted(() => {
 }
 
 .layout__aside-foot {
-  padding: 14px 18px;
-  font-size: 11px;
+  padding:12px 16px;
+  font-size: var(--tp-font-body);
   line-height: 1.7;
-  color: #7c88a1;
+  color:var(--tp-text-secondary);
 }
 
 .layout__aside-foot p {
-  margin: 0;
+  margin:0;
 }
 
 .layout__header {
@@ -188,7 +192,7 @@ onMounted(() => {
   justify-content: space-between;
   background: #fff;
   border-bottom: 1px solid var(--tp-border);
-  padding: 0 18px 0 8px;
+  padding:0 16px 0 8px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -197,28 +201,28 @@ onMounted(() => {
 .layout__header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
 }
 
 .layout__collapse {
-  color: #5b6b85;
+  color:var(--tp-primary);
 }
 
 .layout__page-title {
-  font-size: 16px;
+  font-size: var(--tp-font-section);
   font-weight: 600;
 }
 
 .layout__mock-tag {
-  margin-left: 6px;
+  margin-left:4px;
 }
 
 .layout__user {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding:4px 8px;
   border-radius: 8px;
   transition: background 0.2s;
 }
@@ -229,12 +233,12 @@ onMounted(() => {
 
 .layout__avatar {
   background: var(--tp-primary);
-  color: #fff;
+  color:#ffffff;
   font-weight: 600;
 }
 
 .layout__username {
-  font-size: 14px;
+  font-size: var(--tp-font-body);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -242,7 +246,7 @@ onMounted(() => {
 }
 
 .layout__main {
-  padding: 0;
+  padding:0;
   background: var(--tp-bg);
   overflow-x: hidden;
 }

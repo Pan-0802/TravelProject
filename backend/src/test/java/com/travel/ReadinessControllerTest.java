@@ -1,6 +1,8 @@
 package com.travel;
 
 import com.travel.controller.ReadinessController;
+import com.travel.mapper.SchemaProbe;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.Test;
 import javax.sql.DataSource;
 import java.sql.*;
@@ -11,7 +13,7 @@ class ReadinessControllerTest {
     @Test void connectionFailureIsSanitized() throws Exception {
         DataSource source=mock(DataSource.class);
         when(source.getConnection()).thenThrow(new SQLException("secret JDBC URL and password"));
-        var response=new ReadinessController(source).ready();
+        var response=new ReadinessController(new SchemaProbe(new JdbcTemplate(source))).ready();
         assertThat(response.getStatusCode().value()).isEqualTo(503);
         assertThat(response.getBody().code()).isEqualTo(50300);
         assertThat(response.getBody().toString()).doesNotContain("secret");
@@ -21,7 +23,7 @@ class ReadinessControllerTest {
         Connection connection=mock(Connection.class);
         when(source.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenThrow(new SQLException("missing user table"));
-        assertThat(new ReadinessController(source).ready().getStatusCode().value()).isEqualTo(503);
+        assertThat(new ReadinessController(new SchemaProbe(new JdbcTemplate(source))).ready().getStatusCode().value()).isEqualTo(503);
         verify(connection).close();
     }
 }

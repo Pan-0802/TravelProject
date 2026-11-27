@@ -59,7 +59,9 @@ public class TripService {
         Trip trip = owned(id,true); TripWrite dto = writes.patch(trip,patch,TripWrite.class);
         WriteSupport.range(dto.getStartDate(),dto.getEndDate());
         if (queries.daysOutside(id,dto.getStartDate(),dto.getEndDate()) > 0 || queries.expensesOutside(id,dto.getStartDate(),dto.getEndDate()) > 0)
-            throw new BusinessException(422,"已有行程或消费超出新日期范围，请先调整子数据");
+            throw new BusinessException(422,"已有行程或消费超出新日期范围，请先调整行程、消费日期，或扩大出行日期范围",
+                java.util.Map.of("startDate","请选择包含现有每日行程和消费的日期范围，或先调整这些记录",
+                    "endDate","请选择包含现有每日行程和消费的日期范围，或先调整这些记录"));
         BeanUtils.copyProperties(dto,trip); trips.update(trip); return view(trips.find(id));
     }
     @Transactional public Map<String,Object> delete(Long id) {

@@ -58,6 +58,19 @@ class BackendIntegrationTest {
     }
     Map<String,Object> expense() { return Map.of("category","FOOD","amount",65,"spentOn","2026-12-01"); }
     Map<String,Object> generate() { return Map.of("tripId",tripId,"destination","重庆","startDate","2026-12-01","endDate","2026-12-03","travelDays",3,"totalBudget",1500); }
+    @Test void refinementUsesEditedDaysAndRejectsMismatchedDates() throws Exception {
+        ItemWrite item=new ItemWrite();item.setItemName("当前编辑后的故宫安排");item.setSortOrder(1);
+        var reference=List.of(new Day(LocalDate.parse("2026-12-01"),1,null,List.of(item)),
+            new Day(LocalDate.parse("2026-12-02"),2,null,List.of()),new Day(LocalDate.parse("2026-12-03"),3,null,List.of()));
+        when(ai.generate(any())).thenAnswer(invocation->{Generate request=invocation.getArgument(0);
+            assertThat(request.referenceDays().get(0).items().get(0).getItemName()).isEqualTo("当前编辑后的故宫安排");
+            return new Draft(BigDecimal.ZERO,reference);});
+        var payload=new HashMap<String,Object>(generate());payload.put("referenceDays",reference);payload.put("requirements","保留首日，多休息");
+        call("POST","/api/ai/plans",token,payload,200);
+        payload.put("referenceDays",List.of(reference.get(0)));
+        call("POST","/api/ai/plans",token,payload,422);
+        verify(ai,times(1)).generate(any());
+    }
     List<Day> plannedDays() {
         ItemWrite item=new ItemWrite(); item.setItemName("午餐"); item.setEstimatedCost(new BigDecimal("50.00"));
         return List.of(new Day(LocalDate.parse("2026-12-01"),1,"第一天",List.of(item)),new Day(LocalDate.parse("2026-12-02"),2,null,List.of()),new Day(LocalDate.parse("2026-12-03"),3,null,List.of()));
@@ -120,6 +133,64 @@ class BackendIntegrationTest {
         call("PUT",path+"/order",token,Map.of("itemIds",List.of(a,a)),422);
         call("POST",path,token,Map.of("itemName","bad","startTime","12:00","endTime","11:00"),422);
         call("POST",path,token,Map.of("itemName","bad","sourceType","AI"),400);
+    }
+    String timedItem(String name,String start,String end) throws Exception {
+        Map<String,Object> body=new HashMap<>();body.put("itemName",name);body.put("sortOrder",999);
+        if(start!=null)body.put("startTime",start);if(end!=null)body.put("endTime",end);
+        return call("POST","/api/trips/"+tripId+"/days/2026-12-01/items",token,body,201).path("data").path("itemId").asText();
+    }
+    List<JsonNode> firstDayItems() throws Exception {
+        var result=call("GET","/api/trips/"+tripId+"/days",token,null,200).path("data").path("days").get(0).path("items");
+        List<JsonNode> rows=new ArrayList<>();result.forEach(rows::add);return rows;
+    }
+    @Test void timedManualItemIsInsertedAmongExistingAiActivitiesAndUntimedItemsStayLast() throws Exception {
+        String morning=timedItem("早间活动","08:30","09:20");
+        String afternoon=timedItem("北海公园","14:45","16:30");
+        String dinner=timedItem("晚餐","17:00","18:00");
+        String night=timedItem("什刹海夜景","18:15","19:45");
+        jdbc.update("UPDATE itinerary_item SET source_type='AI' WHERE item_id IN (?,?,?,?)",Long.valueOf(morning),Long.valueOf(afternoon),Long.valueOf(dinner),Long.valueOf(night));
+        timedItem("时间待定",null,null);
+        call("POST","/api/trips/"+tripId+"/expenses",token,expense(),201);
+        String added=timedItem("手动餐馆","16:00",null);
+        var rows=firstDayItems();
+        assertThat(rows.stream().map(r->r.path("itemName").asText())).containsExactly("早间活动","北海公园","手动餐馆","晚餐","什刹海夜景","时间待定");
+        assertThat(rows.stream().map(r->r.path("sortOrder").asInt())).containsExactly(1,2,3,4,5,6);
+        assertThat(rows.get(2).path("itemId").asText()).isEqualTo(added);
+        assertThat(rows.get(2).path("sourceType").asText()).isEqualTo("MANUAL");
+        assertThat(rows.get(2).path("endTime").isNull()).isTrue();
+        assertThat(rows.get(1).path("endTime").asText()).isEqualTo("16:30");
+        assertThat(rows.get(1).path("sourceType").asText()).isEqualTo("AI");
+        assertThat(call("GET","/api/trips/"+tripId+"/budget-summary",token,null,200).path("data").path("actualExpense").decimalValue()).isEqualByComparingTo("65");
+        assertThat(call("GET","/api/trips/"+tripId+"/days",token,null,200).path("data").path("days").get(1).path("items")).isEmpty();
+    }
+    @Test void changingStartTimeRepositionsAndClearingItMovesToUntimedEnd() throws Exception {
+        timedItem("早上","09:00","10:00");timedItem("晚上","18:00","19:00");
+        String changed=timedItem("待修改","16:00",null);
+        call("PATCH","/api/itinerary-items/"+changed,token,Map.of("startTime","08:00"),200);
+        assertThat(firstDayItems().get(0).path("itemId").asText()).isEqualTo(changed);
+        call("PATCH","/api/itinerary-items/"+changed,token,"{\"startTime\":null}",200);
+        assertThat(firstDayItems().get(2).path("itemId").asText()).isEqualTo(changed);
+        assertThat(firstDayItems().get(2).path("startTime").isNull()).isTrue();
+    }
+    @Test void equalStartTimesKeepExistingOrderAndNewItemComesAfterThem() throws Exception {
+        String a=timedItem("同一时段A","12:00",null),b=timedItem("同一时段B","12:00",null);
+        var created=call("POST","/api/trips/"+tripId+"/days/2026-12-01/items",token,Map.of("itemName","同一时段C","startTime","12:00","sortOrder",1),201).path("data");
+        assertThat(firstDayItems().stream().map(r->r.path("itemId").asText())).containsExactly(a,b,created.path("itemId").asText());
+        assertThat(created.path("sortOrder").asInt()).isEqualTo(3);
+    }
+    @Test void editingMetadataPreservesExplicitCustomOrder() throws Exception {
+        String a=timedItem("上午","09:00","10:00"),b=timedItem("下午","16:00","17:00");
+        String path="/api/trips/"+tripId+"/days/2026-12-01/items/order";
+        call("PUT",path,token,Map.of("itemIds",List.of(b,a)),200);
+        call("PATCH","/api/itinerary-items/"+a,token,Map.of("startTime","09:00","note","只修改备注","estimatedCost",20),200);
+        assertThat(firstDayItems().stream().map(r->r.path("itemId").asText())).containsExactly(b,a);
+    }
+    @Test void invalidTimeEditDoesNotPartiallyReorderOrChangeAnotherUsersDay() throws Exception {
+        String a=timedItem("上午","09:00","10:00");timedItem("下午","16:00","17:00");
+        var before=firstDayItems();
+        call("PATCH","/api/itinerary-items/"+a,token,Map.of("startTime","18:00","note","不应写入"),422);
+        call("PATCH","/api/itinerary-items/"+a,otherToken,Map.of("startTime","08:00"),404);
+        assertThat(firstDayItems()).isEqualTo(before);
     }
     @Test void attractionOwnershipFavoritesAndCascade() throws Exception {
         String id=call("POST","/api/attractions",token,Map.of("name","观景点","city","重庆"),201).path("data").path("attractionId").asText();
@@ -269,5 +340,9 @@ class BackendIntegrationTest {
         var clock=java.time.Clock.fixed(java.time.Instant.now().minusSeconds(90000),java.time.ZoneId.of("Asia/Shanghai"));
         var jwt=new com.travel.security.JwtService("test-secret-only-32-bytes-minimum-123456789",86400,clock);
         call("GET","/api/trips",jwt.issue(1L),null,401);
+    }
+    @Test void retiredDistanceEndpointsAreUnavailable() throws Exception {
+        call("POST","/api/pois/route",token,Map.of(),404);
+        call("POST","/api/pois/routes",token,Map.of(),404);
     }
 }

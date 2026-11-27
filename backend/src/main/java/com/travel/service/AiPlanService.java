@@ -63,23 +63,36 @@ public class AiPlanService {
     }
     // Do not wrap network requests in a DB transaction. Failed attempts remain queryable.
     public ObjectNode generate(Generate request) {
+        validateConditions(request);
+        AiPlanRecord record=new AiPlanRecord(); record.setUserId(CurrentUser.id()); record.setTripId(request.tripId()); record.setRequestJson(encode(request));
+        try {
+            Draft draft=client.generate(request);
+            validateGeneratedDraft(draft,request);
+            record.setResponseJson(encode(draft)); record.setEstimatedTotal(draft.estimatedTotal()); record.setStatus("DRAFT");
+        } catch(BusinessException e) {
+            record.setStatus("FAILED"); record.setErrorMessage(e.getMessage()); plans.insert(record); throw e;
+        }
+        plans.insert(record); return detail(record.getAiPlanId());
+    }
+    public void validateConditions(Generate request) {
         writes.validate(request); WriteSupport.range(request.startDate(),request.endDate());
         if(request.travelDays()!=ChronoUnit.DAYS.between(request.startDate(),request.endDate())+1)
             throw new BusinessException(422,"旅行天数必须与日期区间一致");
         if(request.tripId()!=null) matches(trips.owned(request.tripId(),false),request);
-        AiPlanRecord record=new AiPlanRecord(); record.setUserId(CurrentUser.id()); record.setTripId(request.tripId()); record.setRequestJson(encode(request));
-        try {
-            Draft draft=client.generate(request);
+        if(request.referenceDays()!=null) validateDays(request.referenceDays(),request.startDate(),request.endDate());
+    }
+    public void validateGeneratedDraft(Draft draft,Generate request) {
             try {
                 if(draft==null) throw new BusinessException(502,"AI 返回空草稿");
                 writes.validate(draft); validateDays(draft.days(),request.startDate(),request.endDate());
                 if(draft.days().stream().flatMap(d -> d.items().stream()).anyMatch(i -> i.getAttractionId()!=null))
                     throw new BusinessException(502,"AI 不得自动关联本地景点");
             } catch(BusinessException e) { throw new BusinessException(502,"AI 规划未通过日期、时间或金额校验"); }
-            record.setResponseJson(encode(draft)); record.setEstimatedTotal(draft.estimatedTotal()); record.setStatus("DRAFT");
-        } catch(BusinessException e) {
-            record.setStatus("FAILED"); record.setErrorMessage(e.getMessage()); plans.insert(record); throw e;
-        }
+    }
+    public ObjectNode storeChatDraft(Generate request,Draft draft) {
+        validateConditions(request); validateGeneratedDraft(draft,request);
+        AiPlanRecord record=new AiPlanRecord(); record.setUserId(CurrentUser.id()); record.setTripId(request.tripId());
+        record.setRequestJson(encode(request)); record.setResponseJson(encode(draft)); record.setEstimatedTotal(draft.estimatedTotal()); record.setStatus("DRAFT");
         plans.insert(record); return detail(record.getAiPlanId());
     }
     public ObjectNode detail(Long id) {

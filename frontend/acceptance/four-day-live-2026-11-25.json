@@ -1,0 +1,15 @@
+{
+  "syntheticDataOnly": true,
+  "conversationId": "18",
+  "tripId": "49",
+  "turns": 3,
+  "firstCount": 18,
+  "nextCount": 22,
+  "days": 4,
+  "distanceModuleRemoved": true,
+  "compactDayView": true,
+  "questionKeptPlan": true,
+  "savedDays": 4,
+  "actualExpensePreserved": 31,
+  "parseErrors": 0
+}

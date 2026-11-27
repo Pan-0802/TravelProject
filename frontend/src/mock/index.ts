@@ -33,6 +33,8 @@ import type {
   Trip,
   TripStatus
 } from '@/types/api'
+import type {Conversation} from '@/api/conversation'
+import {byStartTime} from '@/utils/schedule'
 
 /* ================= 基础工具 ================= */
 
@@ -352,6 +354,14 @@ function handleExpenseUpdate(db: MockDb, expense: Expense, body: Record<string, 
   return ok(expenseDto(expense))
 }
 
+function positionMockItem(db:MockDb,item:ItineraryItem,position:number,byTime:boolean){
+  const others=db.items.filter(row=>row.dayId===item.dayId&&row.itemId!==item.itemId).sort((a,b)=>a.sortOrder-b.sortOrder)
+  let ordered:ItineraryItem[]
+  if(byTime)ordered=byStartTime([...others,item])
+  else {others.splice(Math.max(0,Math.min(position-1,others.length)),0,item);ordered=others}
+  ordered.forEach((row,index)=>{row.sortOrder=index+1})
+}
+
 function handleItemCreate(db: MockDb, trip: MockTrip, date: string, body: Record<string, any>): Envelope {
   if (!date || date < trip.startDate || date > trip.endDate) {
     return fail(42200, '行程日期需在旅行日期范围内')
@@ -387,31 +397,36 @@ function handleItemCreate(db: MockDb, trip: MockTrip, date: string, body: Record
     note: body.note ? String(body.note) : null
   }
   db.items.push(item)
+  positionMockItem(db,item,item.sortOrder,Boolean(item.startTime))
   saveDb()
   return ok(item)
 }
 
 function handleItemUpdate(db: MockDb, item: ItineraryItem, body: Record<string, any>): Envelope {
+  const next={...item}
   if (body.itemName !== undefined) {
     const itemName = String(body.itemName).trim()
     if (!itemName || itemName.length > 150) return fail(40001, '活动名称长度为 1-150 个字符')
-    item.itemName = itemName
+    next.itemName = itemName
   }
   if (body.attractionId !== undefined) {
     if (body.attractionId && !db.attractions.some((a) => a.attractionId === body.attractionId)) {
       return fail(40001, '关联景点不存在')
     }
-    item.attractionId = body.attractionId || null
+    next.attractionId = body.attractionId || null
   }
-  if (body.startTime !== undefined) item.startTime = body.startTime || null
-  if (body.endTime !== undefined) item.endTime = body.endTime || null
-  if (item.startTime && item.endTime && item.endTime < item.startTime) {
+  if (body.startTime !== undefined) next.startTime = body.startTime || null
+  if (body.endTime !== undefined) next.endTime = body.endTime || null
+  if (next.startTime && next.endTime && next.endTime < next.startTime) {
     return fail(40001, '结束时间不能早于开始时间')
   }
-  if (body.transportation !== undefined) item.transportation = body.transportation || null
-  if (body.estimatedCost !== undefined) item.estimatedCost = round2(Number(body.estimatedCost) || 0)
-  if (body.note !== undefined) item.note = body.note ? String(body.note) : null
-  if (body.sortOrder !== undefined && Number(body.sortOrder) > 0) item.sortOrder = Number(body.sortOrder)
+  if (body.transportation !== undefined) next.transportation = body.transportation || null
+  if (body.estimatedCost !== undefined) next.estimatedCost = round2(Number(body.estimatedCost) || 0)
+  if (body.note !== undefined) next.note = body.note ? String(body.note) : null
+  if (body.sortOrder !== undefined && Number(body.sortOrder) > 0) next.sortOrder = Number(body.sortOrder)
+  const timeChanged=(item.startTime||null)!==(next.startTime||null)
+  Object.assign(item,next)
+  positionMockItem(db,item,item.sortOrder,timeChanged)
   saveDb()
   return ok(item)
 }
@@ -566,11 +581,47 @@ function handleAiSave(db: MockDb, plan: MockAiPlan, body: Record<string, any>): 
 
 /* ================= 路由 ================= */
 
+function handleConversation(db:MockDb,method:string,path:string,query:Record<string,string>,body:Record<string,any>):Envelope {
+  const rows=db.conversations ||= []
+  if(path==='/ai/conversations'&&method==='get')return ok(paginate([...rows].reverse(),Number(query.page)||1,20))
+  if(path==='/ai/conversations'&&method==='post'){
+    const source=body.aiPlanId?db.aiPlans.find(p=>p.aiPlanId===String(body.aiPlanId)&&p.userId===MOCK_USER_ID):null
+    if(body.aiPlanId&&!source)return fail(40400,'方案不存在')
+    const conditions=source?.request||body.conditions
+    if(!conditions?.destination||!conditions.startDate||!conditions.endDate)return fail(40001,'请填写完整旅行条件')
+    const chat:Conversation={conversationId:nextId(db),title:conditions.destination+' · '+conditions.travelDays+'天旅行',version:0,processing:false,conditions,currentPlan:source?planDto(source):null,currentDays:body.currentDays||source?.days||null,memory:'',messages:[],createdAt:nowString(),updatedAt:nowString()}
+    rows.push(chat);saveDb();return ok(chat)
+  }
+  const match=path.match(/^\/ai\/conversations\/(\d+)(?:\/(messages(?:\/submit)?|draft))?$/),row=rows.find(r=>r.conversationId===match?.[1])
+  if(!row)return fail(40400,'会话不存在')
+  if(row.currentPlan){const latest=db.aiPlans.find(p=>p.aiPlanId===row.currentPlan?.aiPlanId);if(latest)row.currentPlan=planDto(latest)}
+  if(method==='get')return ok(row)
+  if(method==='delete'){db.conversations=rows.filter(r=>r!==row);saveDb();return ok({deleted:true})}
+  if(match?.[2]?.startsWith('messages')&&method==='post'){
+    if(row.messages.some(m=>m.requestId===body.requestId))return ok(row)
+    if(body.expectedVersion!==row.version)return fail(40900,'会话已更新，请刷新')
+    if(body.currentDays)row.currentDays=body.currentDays
+    const changed=body.intent==='REVISE'||(body.intent==='AUTO'&&/生成|调整|减少|增加|改成/.test(body.content))
+    let linked:string|null=null
+    if(changed){const generated=handleAiGenerate(db,{...row.conditions,requirements:String(body.content).slice(0,500)});if(generated.code!==0)return generated;row.currentPlan=generated.data as AiPlan;row.currentDays=row.currentPlan.days;linked=row.currentPlan.aiPlanId}
+    const stamp=nowString()
+    row.messages.push({messageId:nextId(db),requestId:body.requestId,role:'user',content:body.content,status:'COMPLETED',errorMessage:null,planId:null,createdAt:stamp})
+    row.messages.push({messageId:nextId(db),requestId:body.requestId,role:'assistant',content:changed?'演示回复：已生成模拟行程。真实 AI 会结合历史消息与当前编辑继续调整。':'演示回复：通常可以按相邻区域安排景点，减少转场；本轮保留当前方案。此回复为本地模拟。',status:'COMPLETED',errorMessage:null,planId:linked,createdAt:stamp})
+    row.version+=2;row.updatedAt=stamp;row.memory=String(row.conditions.requirements||'')+'；'+String(body.content).slice(0,500);saveDb();return ok(row)
+  }
+  if(match?.[2]==='draft'&&method==='put'){
+    if(body.expectedVersion!==row.version||row.currentPlan?.status!=='DRAFT')return fail(40900,'会话已更新或草稿不能编辑')
+    row.currentDays=body.days;row.version++;row.updatedAt=nowString();saveDb();return ok(row)
+  }
+  return fail(40400,'会话操作不存在')
+}
+
 function handleRequest(method: string, path: string, query: Record<string, string>, bodyRaw: unknown): Envelope {
   const db = getDb()
   const body: Record<string, any> = typeof bodyRaw === 'string' ? safeParse(bodyRaw)
     : bodyRaw && typeof bodyRaw === 'object' && !Array.isArray(bodyRaw) ? bodyRaw as Record<string, any> : {}
 
+  if(path.startsWith('/ai/conversations'))return handleConversation(db,method,path,query,body)
   /* --- auth --- */
   if (method === 'post' && path === '/auth/register') {
     const username = String(body.username || '').trim()

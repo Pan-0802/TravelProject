@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-25",
+  "issue": "AI会话解析失败、重复重试状态和北京路线地点匹配",
+  "syntheticAccountsOnly": true,
+  "backend": {
+    "passed": 66,
+    "failed": 0,
+    "skipped": 23,
+    "skippedScope": "需显式启用的 MySQL 专项套件；本轮另外通过真实 MySQL 的浏览器保存、消费隔离和历史恢复验收"
+  },
+  "frontend": {
+    "build": "passed",
+    "verifiedScenarios": 35,
+    "execution": "全套35场景中33项先通过；两项真实AI场景在解码器修复后分别复测通过，不是一次未修复的全套成功结果",
+    "controlledChatAndRoutes": 22,
+    "otherScenarios": 11,
+    "realAiScenarios": 2
+  },
+  "ai": {
+    "oneDayThreeTurns": "passed using direct provider",
+    "fourDayThreeTurns": "passed using a local recording proxy that forwards only whitelisted synthetic conditions unchanged",
+    "fourDayActivityCountBefore": 18,
+    "fourDayActivityCountAfter": 23,
+    "formalSavedDayCount": 4,
+    "formalSavedActivityCount": 23,
+    "actualExpensePreserved": 31,
+    "questionKeptDraft": true,
+    "missingOrTruncatedPlansNeverCompleted": true,
+    "automaticPaidRetries": false
+  },
+  "route": {
+    "names": [
+      "天坛公园",
+      "前门大街",
+      "大栅栏商业街",
+      "杨梅竹斜街"
+    ],
+    "verifiedLegs": 3,
+    "totalLegs": 3,
+    "thirdLegExplicitWalkingFallback": true,
+    "placeOrderCheckedBeforeRendering": true
+  },
+  "sourceSecretCheck": {
+    "matches": 0,
+    "keysPrinted": false
+  },
+  "restart": "停止并重新运行后端 TravelApplication；在前端原运行终端 Ctrl+C 后 npm run dev；刷新已有会话再手动重试失败消息。已执行04的数据库无需导入任何SQL。",
+  "related": [
+    "beijing-routes-2026-11-25.json",
+    "beijing-routes-2026-11-25.png",
+    "four-day-live-2026-11-25.json",
+    "four-day-chat-2026-11-25.png",
+    "chat-live-2026-11-25.json"
+  ],
+  "status": "historical",
+  "supersededBy": "ux-simplification-2026-11-25.json",
+  "currentDistanceModule": "removed"
+}

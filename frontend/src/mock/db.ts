@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import type {Conversation} from '@/api/conversation'
 import type {
   AiPlan,
   AiPlanDay,
@@ -67,6 +68,7 @@ export interface MockDb {
   items: ItineraryItem[]
   expenses: Expense[]
   aiPlans: MockAiPlan[]
+  conversations?: Conversation[]
 }
 
 export const MOCK_TOKEN = 'mock-token-demo'

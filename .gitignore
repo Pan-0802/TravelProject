@@ -18,3 +18,4 @@ Thumbs.db
 *.log
 **/test-results/
 **/playwright-report/
+/.course-build/

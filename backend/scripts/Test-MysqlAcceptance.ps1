@@ -45,7 +45,7 @@ try {
     $env:MYSQL_TEST_USERNAME = $Username
     $env:MYSQL_TEST_PASSWORD = [Net.NetworkCredential]::new('', $Password).Password
     $env:RUN_MYSQL_ACCEPTANCE = 'true'
-    # The Java test creates travel_acceptance_<random> and drops only that schema afterwards.
+    # The Java test creates a fixed travel_acceptance_course catalog. It refuses to start if that catalog exists and drops only its own newly created catalog.
     & mvn '-Dtest=MysqlAcceptanceTest' test
     if ($LASTEXITCODE -ne 0) { throw 'MySQL acceptance tests failed. See target/surefire-reports.' }
 } finally {

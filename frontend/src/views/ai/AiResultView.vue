@@ -1,5 +1,6 @@
 <template>
   <div class="page" v-loading="loading" element-loading-text="加载方案中…">
+    <RequestError :message="loadFailure" :loading="loading" @retry="loadPlan"/>
     <div class="page-header">
       <div>
         <el-button link :icon="ArrowLeft" class="back-btn" @click="router.push('/ai')">
@@ -13,11 +14,12 @@
           <span class="sep">·</span>
           {{ plan.travelDays }} 天
           <span class="sep">·</span>
-          预估费用 <span class="tp-money">{{ money(plan.estimatedTotal) }}</span>
+          当前方案预估 <span class="tp-money">{{ money(editedTotal) }}</span>
         </p>
       </div>
 
       <div class="header-actions" v-if="plan">
+        <el-button :disabled="saving" :loading="openingChat" @click="openConversation">在会话中继续讨论</el-button>
         <el-button :icon="Refresh" :disabled="saving" @click="loadPlan">重新加载</el-button>
         <el-button
           v-if="isDraft"
@@ -83,8 +85,8 @@
               :value="trip.tripId"
             />
           </el-select>
-          <el-button v-if="isDraft" text type="primary" @click="router.push('/trips')">
-            去创建旅行
+          <el-button v-if="isDraft && !plan.tripId" text type="primary" @click="createTripVisible = true">
+            按此方案创建旅行
           </el-button>
         </div>
         <div class="save-bar__hint">
@@ -105,8 +107,13 @@
         </div>
       </div>
 
+      <div v-if="isDraft" class="tp-card tp-card__body refine-bar">
+        <strong>想换一种安排？</strong><p class="tp-muted">直接说哪里不合适，AI 会参考当前编辑后的行程生成另一版；原草稿保留。</p>
+        <div class="refine-row"><el-input v-model="refinement" maxlength="200" placeholder="例如：第二天太赶，减少一个景点，多留时间吃饭" :disabled="refining"/><el-button :loading="refining" :disabled="!plan.request || !refinement.trim() || saving" @click="refine">按新要求生成另一版</el-button></div>
+      </div>
+      <nav class="day-navigation" aria-label="跳转到某天"><el-button v-for="day in days" :key="day.date" size="small" @click="jumpToDay(day.date)">第 {{ day.dayNumber }} 天 · {{ day.date.slice(5) }}</el-button></nav>
       <!-- 每日行程编辑 -->
-      <div v-for="(day, dayIndex) in days" :key="day.date" class="tp-card day-editor">
+      <div v-for="(day, dayIndex) in days" :id="'plan-day-'+day.date" :key="day.date" class="tp-card day-editor">
         <div class="day-editor__head">
           <span class="day-badge">第 {{ day.dayNumber }} 天</span>
           <span class="day-date">{{ day.date }} {{ weekday(day.date) }}</span>
@@ -119,6 +126,7 @@
             :disabled="!isDraft"
           />
           <div class="tp-toolbar__spacer"></div>
+          <el-button v-if="isDraft&&needsTimeOrder(day.items)" size="small" text type="primary" @click="arrangeDay(dayIndex)">按时间整理</el-button>
           <el-button
             size="small"
             type="primary"
@@ -137,8 +145,10 @@
 
         <div v-for="(item, itemIndex) in day.items" :key="itemIndex" class="item-editor">
           <div class="item-editor__top">
+            <span class="activity-index">{{ itemIndex + 1 }}</span>
             <el-time-picker
               v-model="item.startTime"
+              @change="autoSchedule(dayIndex,itemIndex)"
               format="HH:mm"
               value-format="HH:mm"
               placeholder="开始"
@@ -167,9 +177,12 @@
             <el-button text type="danger" size="small" :disabled="!isDraft" @click="removeItem(dayIndex, itemIndex)">
               删除
             </el-button>
+            <el-button text size="small" :disabled="!isDraft || itemIndex===0" @click="moveItem(dayIndex,itemIndex,-1)">上移</el-button>
+            <el-button text size="small" :disabled="!isDraft || itemIndex===day.items.length-1" @click="moveItem(dayIndex,itemIndex,1)">下移</el-button>
           </div>
 
-          <div class="item-editor__bottom">
+          <div class="item-meta"><span>预计 {{ money(item.estimatedCost) }} · {{ item.transportation || '交通待定' }}</span><el-button text size="small" @click="expanded=expanded===day.date+itemIndex?'':day.date+itemIndex">{{ expanded===day.date+itemIndex?'收起详情':'费用、景点与备注' }}</el-button></div>
+          <div v-show="expanded===day.date+itemIndex" class="item-editor__bottom">
             <el-select
               v-model="item.transportation"
               size="small"
@@ -198,6 +211,7 @@
 
             <el-select
               v-model="item.attractionId"
+              @change="(id: string) => linkAttraction(item, id)"
               size="small"
               placeholder="关联本地景点（可选）"
               clearable
@@ -230,12 +244,16 @@
         <el-button type="primary" :loading="saving" @click="handleSave">确认保存到旅行</el-button>
       </div>
     </template>
+    <TripFormDialog v-if="plan" v-model="createTripVisible" :prefill="{title:plan.destination+'旅行',destination:plan.destination,startDate:plan.startDate,endDate:plan.endDate,totalBudget:plan.request?.totalBudget ?? editedTotal}" @saved="tripCreated" />
   </div>
 </template>
 
 <script setup lang="ts">
+import RequestError from "@/components/common/RequestError.vue"
+import {errorMessage} from "@/utils/request"
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import {byStartTime,insertByTime,needsTimeOrder} from '@/utils/schedule'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus, Refresh } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
@@ -245,6 +263,8 @@ import { AI_STATUS_LABELS, AI_STATUS_TAG_TYPE, TRANSPORTATION_OPTIONS } from '@/
 import type { AiPlan, AiPlanDay, AiPlanItem, Attraction, Trip } from '@/types/api'
 import { money, weekday } from '@/utils/format'
 import { errorCode } from '@/utils/request'
+import TripFormDialog from '@/components/trip/TripFormDialog.vue'
+import {conversationApi} from '@/api/conversation'
 
 const route = useRoute()
 const router = useRouter()
@@ -255,7 +275,34 @@ const trips = ref<Trip[]>([])
 const attractions = ref<Attraction[]>([])
 const selectedTripId = ref('')
 const loading = ref(false)
+const loadFailure=ref('')
 const saving = ref(false)
+const openingChat=ref(false)
+async function openConversation(){if(!plan.value)return;openingChat.value=true;try{const chat=await conversationApi.create({aiPlanId:plan.value.aiPlanId,...(dirty.value?{currentDays:buildDays()}:{})});allowLeave=true;await router.push('/ai/chat/'+chat.conversationId)}catch(e){ElMessage.error((e as Error).message)}finally{openingChat.value=false;allowLeave=false}}
+const expanded = ref('')
+const createTripVisible = ref(false), refinement = ref(''), refining = ref(false)
+let allowLeave = false
+const editedTotal = computed(() => days.value.reduce((n,d)=>n+d.items.reduce((s,i)=>s+Number(i.estimatedCost||0),0),0))
+const dirty = computed(() => isDraft.value && JSON.stringify(days.value)!==JSON.stringify(normalizeDays(plan.value?.days||[])))
+function arrangeDay(index:number){const day=days.value[index];if(day){day.items=byStartTime(day.items);day.items.forEach((item,i)=>{item.sortOrder=i+1})}}
+function autoSchedule(dayIndex:number,itemIndex:number){const day=days.value[dayIndex],item=day?.items[itemIndex];if(day&&item){day.items=insertByTime(day.items,item,itemIndex);day.items.forEach((entry,i)=>{entry.sortOrder=i+1})}}
+function moveItem(d:number,i:number,offset:number) { const items=days.value[d]?.items; if(!items) return; const removed=items.splice(i,1)[0]; if(removed) items.splice(i+offset,0,removed) }
+function linkAttraction(item:AiPlanItem,id:string) { const a=attractions.value.find(a=>a.attractionId===id); if(a) item.itemName=a.name }
+function jumpToDay(date:string) {document.getElementById('plan-day-'+date)?.scrollIntoView({behavior:'smooth',block:'start'})}
+async function tripCreated(trip:Trip) { await loadTrips();selectedTripId.value=trip.tripId }
+async function refine() {
+  if(!plan.value?.request || refining.value || !refinement.value.trim()) return
+  if(days.value.some(d=>d.items.some(i=>!i.itemName.trim()))){ElMessage.warning('先补全空白活动名称，再让 AI 调整');return}
+  if(dirty.value) { try { await ElMessageBox.confirm('将参考当前编辑后的安排，按新要求生成另一版；不会立即覆盖正式行程。继续吗？','生成另一版') } catch { return } }
+  refining.value=true
+  try {
+    const original=plan.value.request
+    const referenceDays=buildDays().map(d=>({...d,items:d.items.map(({attractionId,...item})=>item)}))
+    const result=await conversationApi.create({conditions:{...original,referenceDays,requirements:((original.requirements||'').slice(0,280)+'；调整要求：'+refinement.value.trim()).slice(0,500)}})
+    allowLeave=true;await router.push({path:'/ai/chat/'+result.conversationId,query:{start:'1'}});refinement.value=''
+  } catch(e) { ElMessage.error((e as Error).message+'，当前方案和修改已保留') }
+  finally { refining.value=false;allowLeave=false }
+}
 
 const aiPlanId = computed(() => String(route.params.aiPlanId || ''))
 const isDraft = computed(() => plan.value?.status === 'DRAFT')
@@ -299,12 +346,19 @@ function normalizeDays(source: AiPlanDay[]): AiPlanDay[] {
 
 async function loadPlan() {
   loading.value = true
+  loadFailure.value=''
   try {
     const detail = await aiApi.detail(aiPlanId.value)
     plan.value = detail
     days.value = normalizeDays(detail.days)
     selectedTripId.value = detail.tripId || ''
-  } catch {
+    if(detail.status==='DRAFT') {
+      try { const saved=JSON.parse(sessionStorage.getItem('ai-edit:'+detail.aiPlanId)||'null');
+        if(saved && saved.original===JSON.stringify(detail.days)) {days.value=saved.days;selectedTripId.value=saved.tripId||detail.tripId||'';ElMessage.info('已恢复本窗口尚未保存的方案修改')}
+      } catch { /* Ignore damaged local draft; the server result is still valid. */ }
+    } else sessionStorage.removeItem('ai-edit:'+detail.aiPlanId)
+  } catch(error) {
+    loadFailure.value=errorMessage(error)
     plan.value = null
     days.value = []
   } finally {
@@ -411,11 +465,13 @@ async function submitSave(confirmOverwrite: boolean) {
     days: buildDays()
   })
   ElMessage.success(`已保存 ${result.savedDays} 天、${result.savedItems} 个行程项`)
+  plan.value.status='SAVED'
+  sessionStorage.removeItem('ai-edit:'+plan.value.aiPlanId)
   await router.push(`/trips/${result.tripId}`)
 }
 
 async function handleSave() {
-  if (saving.value || !plan.value) return
+  if (saving.value || refining.value || !plan.value) return
 
   const error = validate()
   if (error) {
@@ -480,56 +536,64 @@ onMounted(async () => {
   await loadPlan()
   await Promise.all([loadTrips(), loadAttractions()])
 })
+watch([days,selectedTripId],()=>{if(plan.value?.status==='DRAFT') {try {sessionStorage.setItem('ai-edit:'+plan.value.aiPlanId,JSON.stringify({original:JSON.stringify(plan.value.days),days:days.value,tripId:selectedTripId.value}))}catch{/* Storage can be unavailable. */}}},{deep:true})
+onBeforeRouteLeave(async()=>{
+  if(refining.value && !allowLeave){ElMessage.info('正在生成另一版，请稍候');return false}
+  if(dirty.value && !allowLeave) {try{await ElMessageBox.confirm('方案修改还未保存到旅行。修改已保留在当前窗口，确定离开吗？','离开方案编辑',{confirmButtonText:'离开',cancelButtonText:'继续编辑'})}catch{return false}}
+})
 </script>
 
 <style scoped>
+.day-navigation{display:flex;gap:8px;flex-wrap:wrap;padding:8px 0;margin-bottom:8px;position:sticky;top:60px;z-index:5;background:#f4f6fc}.day-navigation .el-button{margin-left:0}
+.item-meta{display:flex;justify-content:space-between;align-items:center;font-size: var(--tp-font-body);color:var(--tp-primary);padding-top:4px}
+.refine-bar{margin-bottom:16px}.refine-row{display:flex;gap:12px;flex-wrap:wrap}.refine-row .el-input{flex:1;min-width:230px}.activity-index{color:var(--tp-primary);background:#edf3ff;border-radius:6px;padding:4px 8px}.day-editor{scroll-margin-top:24px}
 .back-btn {
-  margin-bottom: 6px;
-  padding-left: 0;
+  margin-bottom:4px;
+  padding-left:0;
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
 .sep {
-  color: #c3ccda;
-  margin: 0 2px;
+  color:#c3ccda;
+  margin:0 4px;
 }
 
 .page-subtitle {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap:4px;
   flex-wrap: wrap;
 }
 
 .ai-disclaimer {
-  margin-bottom: 14px;
+  margin-bottom:12px;
 }
 
 .save-bar {
-  margin-bottom: 16px;
+  margin-bottom:16px;
 }
 
 .save-bar__field {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap:12px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom:8px;
 }
 
 .save-bar__label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--tp-font-body);
 }
 
 .day-editor {
-  padding: 14px 16px;
-  margin-bottom: 14px;
+  padding:12px 16px;
+  margin-bottom:12px;
   border: 1px solid var(--tp-border);
   background: #fff;
 }
@@ -537,24 +601,24 @@ onMounted(async () => {
 .day-editor__head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap:8px;
   flex-wrap: wrap;
-  padding-bottom: 10px;
+  padding-bottom:8px;
   border-bottom: 1px dashed var(--tp-border);
 }
 
 .day-badge {
   background: var(--tp-primary);
-  color: #fff;
+  color:#ffffff;
   border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
+  padding:4px 8px;
+  font-size: var(--tp-font-body);
   font-weight: 600;
 }
 
 .day-date {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--tp-font-body);
 }
 
 .day-desc {
@@ -562,13 +626,13 @@ onMounted(async () => {
 }
 
 .day-editor__empty {
-  padding: 12px 4px;
+  padding:12px 4px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
 
 .item-editor {
-  padding: 10px 0;
+  padding:8px 0;
   border-bottom: 1px dashed var(--tp-border);
 }
 
@@ -579,20 +643,20 @@ onMounted(async () => {
 .item-editor__top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
 .item-editor__bottom {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap:8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top:8px;
 }
 
 .dash {
-  color: #b6c0d0;
+  color:var(--tp-text-secondary);
 }
 
 .item-name {
@@ -608,7 +672,7 @@ onMounted(async () => {
 .bottom-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 6px 0 40px;
+  gap:8px;
+  padding:4px 0 24px;
 }
 </style>

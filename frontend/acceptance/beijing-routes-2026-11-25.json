@@ -1,0 +1,67 @@
+{
+  "syntheticDataOnly": true,
+  "requestedNames": [
+    "天坛公园",
+    "前门大街",
+    "大栅栏商业街",
+    "杨梅竹斜街"
+  ],
+  "stops": [
+    {
+      "name": "天坛公园",
+      "status": "MATCHED",
+      "matchedName": "天坛公园"
+    },
+    {
+      "name": "前门大街",
+      "status": "MATCHED",
+      "matchedName": "前门大街"
+    },
+    {
+      "name": "大栅栏商业街",
+      "status": "MATCHED",
+      "matchedName": "北京大栅栏"
+    },
+    {
+      "name": "杨梅竹斜街",
+      "status": "MATCHED",
+      "matchedName": "杨梅竹斜街"
+    }
+  ],
+  "legs": [
+    {
+      "mode": "TRANSIT",
+      "originName": "天坛公园",
+      "destinationName": "前门大街",
+      "status": "OK",
+      "source": "AMAP_ROUTE",
+      "distanceMeters": 3852,
+      "durationSeconds": 2459,
+      "fromIndex": 0,
+      "toIndex": 1
+    },
+    {
+      "mode": "TRANSIT",
+      "originName": "前门大街",
+      "destinationName": "北京大栅栏",
+      "status": "OK",
+      "source": "AMAP_ROUTE",
+      "distanceMeters": 1605,
+      "durationSeconds": 1415,
+      "fromIndex": 1,
+      "toIndex": 2
+    },
+    {
+      "mode": "WALK",
+      "originName": "北京大栅栏",
+      "destinationName": "杨梅竹斜街",
+      "status": "OK",
+      "source": "AMAP_ROUTE",
+      "distanceMeters": 428,
+      "durationSeconds": 342,
+      "notice": "暂无合适公交方案，以下为步行参考",
+      "fromIndex": 2,
+      "toIndex": 3
+    }
+  ]
+}

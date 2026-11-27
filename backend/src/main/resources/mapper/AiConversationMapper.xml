@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.travel.mapper.AiConversationMapper">
+  <select id="find" resultType="com.travel.domain.AiConversation">SELECT * FROM ai_conversation WHERE conversation_id=#{id}</select>
+  <select id="lock" resultType="com.travel.domain.AiConversation">SELECT * FROM ai_conversation WHERE conversation_id=#{id} FOR UPDATE</select>
+  <select id="forPlan" resultType="com.travel.domain.AiConversation">SELECT * FROM ai_conversation WHERE user_id=#{userId} AND current_plan_id=#{planId} ORDER BY updated_at DESC LIMIT 1</select>
+  <select id="list" resultType="com.travel.domain.AiConversation">SELECT * FROM ai_conversation WHERE user_id=#{userId} ORDER BY updated_at DESC,conversation_id DESC LIMIT #{limit} OFFSET #{offset}</select>
+  <select id="count" resultType="long">SELECT COUNT(*) FROM ai_conversation WHERE user_id=#{userId}</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="conversationId">
+    INSERT INTO ai_conversation(user_id,title,conditions_json,current_plan_id,current_days_json,memory,version)
+    VALUES(#{userId},#{title},#{conditionsJson},#{currentPlanId},#{currentDaysJson},#{memory},#{version})
+  </insert>
+  <update id="update">UPDATE ai_conversation SET current_plan_id=#{currentPlanId},current_days_json=#{currentDaysJson},memory=#{memory},version=#{version},active_request_id=#{activeRequestId},started_at=#{startedAt},updated_at=CURRENT_TIMESTAMP WHERE conversation_id=#{conversationId}</update>
+  <delete id="delete">DELETE FROM ai_conversation WHERE conversation_id=#{id}</delete>
+  <select id="messages" resultType="com.travel.domain.AiChatMessage">SELECT * FROM ai_chat_message WHERE conversation_id=#{id} ORDER BY message_id LIMIT 200</select>
+  <select id="recent" resultType="com.travel.domain.AiChatMessage">SELECT * FROM ai_chat_message WHERE conversation_id=#{id} AND status='COMPLETED' ORDER BY message_id DESC LIMIT 24</select>
+  <select id="messageCount" resultType="int">SELECT COUNT(*) FROM ai_chat_message WHERE conversation_id=#{id}</select>
+  <select id="request" resultType="com.travel.domain.AiChatMessage">SELECT * FROM ai_chat_message WHERE conversation_id=#{id} AND request_id=#{requestId} AND role='user'</select>
+  <insert id="insertMessage" useGeneratedKeys="true" keyProperty="messageId">
+    INSERT INTO ai_chat_message(conversation_id,request_id,role,content,status,error_message,plan_id) VALUES(#{conversationId},#{requestId},#{role},#{content},#{status},#{errorMessage},#{planId})
+  </insert>
+  <update id="updateMessage">UPDATE ai_chat_message SET status=#{status},error_message=#{errorMessage},plan_id=#{planId} WHERE message_id=#{messageId}</update>
+</mapper>

@@ -11,19 +11,19 @@
       size="large"
       @submit.prevent="handleSubmit"
     >
-      <el-form-item label="用户名" prop="username">
+      <el-form-item label="用户名" prop="username" :error="fieldErrors.username">
         <el-input v-model.trim="form.username" placeholder="1-50 位，建议字母/数字/下划线" clearable />
       </el-form-item>
 
-      <el-form-item label="昵称（可选）" prop="nickname">
+      <el-form-item label="昵称（可选）" prop="nickname" :error="fieldErrors.nickname">
         <el-input v-model.trim="form.nickname" placeholder="最多 60 字" clearable maxlength="60" />
       </el-form-item>
 
-      <el-form-item label="密码" prop="password">
+      <el-form-item label="密码" prop="password" :error="fieldErrors.password">
         <el-input v-model="form.password" type="password" placeholder="8-72 位" show-password />
       </el-form-item>
 
-      <el-form-item label="确认密码" prop="confirmPassword">
+      <el-form-item label="确认密码" prop="confirmPassword" :error="fieldErrors.confirmPassword">
         <el-input
           v-model="form.confirmPassword"
           type="password"
@@ -42,7 +42,8 @@
       >
         注册
       </el-button>
-    </el-form>
+    <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" role="alert" />
+</el-form>
 
     <div class="auth-card__footer">
       <span>已有账号？</span>
@@ -52,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormItemRule, type FormRules } from 'element-plus'
@@ -59,6 +61,7 @@ import { authApi } from '@/api/auth'
 
 const router = useRouter()
 const formRef = ref<FormInstance>()
+const {fieldErrors,submitError,clearErrors,showError}=useFormErrors()
 const loading = ref(false)
 
 const form = reactive({
@@ -93,6 +96,7 @@ const rules: FormRules = {
 }
 
 async function handleSubmit() {
+  clearErrors()
   if (loading.value) return
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -107,8 +111,8 @@ async function handleSubmit() {
     })
     ElMessage.success('注册成功，请登录')
     await router.replace({ path: '/auth/login', query: { username: form.username } })
-  } catch {
-    // 409 用户名重复等错误已由拦截器提示
+  } catch (error) {
+    showError(error)
   } finally {
     loading.value = false
   }
@@ -117,30 +121,30 @@ async function handleSubmit() {
 
 <style scoped>
 .auth-card__title {
-  margin: 0 0 6px;
-  font-size: 24px;
+  margin:0 0 4px;
+  font-size: var(--tp-font-title);
   font-weight: 700;
 }
 
 .auth-card__subtitle {
-  margin: 0 0 22px;
+  margin:0 0 24px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
   line-height: 1.6;
 }
 
 .auth-card__submit {
   width: 100%;
-  margin-top: 4px;
+  margin-top:4px;
 }
 
 .auth-card__footer {
-  margin-top: 18px;
+  margin-top:16px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
   display: flex;
   justify-content: center;
-  gap: 6px;
+  gap:4px;
 }
 </style>

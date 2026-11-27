@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-25",
+  "feature": "多轮旅行规划对话",
+  "backend": {
+    "passed": 46,
+    "suites": [
+      {
+        "name": "com.travel.AiClientTest",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.travel.AiConversationIntegrationTest",
+        "tests": "11",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.travel.BackendIntegrationTest",
+        "tests": "21",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.travel.integration.RouteClientTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.travel.MysqlAcceptanceTest",
+        "tests": "22",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "22"
+      },
+      {
+        "name": "com.travel.ReadinessControllerTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ]
+  },
+  "frontend": {
+    "productionBuild": "passed",
+    "fullBrowserRun": {
+      "passed": 28,
+      "failed": 0
+    },
+    "finalChatEdgeRun": {
+      "startTime": "2026-11-25T03:56:34.266Z",
+      "duration": 22303.196,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "uniqueBrowserScenariosVerified": 29,
+    "mockSmoke": "login, create conversation, two replies, reload recovery; passed with no runtime errors"
+  },
+  "realChat": {
+    "username": "chat_live_1795578772745",
+    "conversationId": "2",
+    "tripId": "28",
+    "firstPlanId": "17",
+    "latestPlanId": "18",
+    "turns": 3,
+    "messageCount": 6,
+    "questionKeptPlan": true,
+    "editedDaysSent": true,
+    "savedAfterConfirmation": true,
+    "actualExpensePreserved": 27,
+    "historyRestored": true
+  },
+  "database": {
+    "migration": "ER图和Mysql/04_AI多轮会话_增量升级.sql",
+    "localMigrationApplied": true,
+    "newTables": [
+      "ai_conversation",
+      "ai_chat_message"
+    ],
+    "originalBusinessTablesUnmodified": true
+  },
+  "notes": [
+    "Only the existing API provider configuration is used; no API keys stored in frontend or reports.",
+    "MySQL专项22项未在本轮显式运行；真实对话与保存使用本机MySQL。",
+    "Full 28-case browser run preceded one added offline-mode edge case; final targeted run passed all 9 conversation cases."
+  ]
+}

@@ -13,7 +13,7 @@ export const expenseApi = {
   list(tripId: string, params: ExpenseQuery) {
     return http.get<PageResult<Expense>>(`/trips/${tripId}/expenses`, {
       page: params.page ?? 1,
-      size: params.size ?? 10,
+      size: params.size ?? 20,
       category: params.category || undefined,
       startDate: params.startDate || undefined,
       endDate: params.endDate || undefined

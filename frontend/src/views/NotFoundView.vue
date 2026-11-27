@@ -19,19 +19,19 @@ const router = useRouter()
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap:12px;
   background: var(--tp-bg);
 }
 
 .not-found h1 {
-  font-size: 72px;
-  margin: 0;
+  font-size: var(--tp-font-title);
+  margin:0;
   color: var(--tp-primary);
   letter-spacing: 4px;
 }
 
 .not-found p {
-  margin: 0 0 12px;
+  margin:0 0 12px;
   color: var(--tp-text-secondary);
 }
 </style>

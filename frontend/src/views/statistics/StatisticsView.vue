@@ -10,6 +10,8 @@
       <el-button :icon="Refresh" text @click="loadAll">刷新</el-button>
     </div>
 
+    <RequestError :message="failure" :loading="loading" @retry="loadAll"/>
+    <div v-show="!failure">
     <!-- 总览 -->
     <div class="stat-grid">
       <div class="stat-card">
@@ -90,10 +92,13 @@
       <div v-if="!comparisonItems.length" class="chart-empty">还没有可用于对比的旅行</div>
       <div v-show="comparisonItems.length" ref="compareRef" class="chart-box chart-box--tall"></div>
     </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import RequestError from "@/components/common/RequestError.vue"
+import {errorMessage} from "@/utils/request"
 import { computed, onMounted, ref } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { statisticsApi } from '@/api/statistics'
@@ -111,6 +116,7 @@ import type {
 import { money } from '@/utils/format'
 
 const loading = ref(false)
+const failure=ref('')
 const overview = ref<StatisticsOverview | null>(null)
 const categoryStats = ref<CategoryStatistics | null>(null)
 const costItems = ref<TripCostItem[]>([])
@@ -141,8 +147,8 @@ function categoryColor(category: ExpenseCategory) {
 async function loadOverview() {
   try {
     overview.value = await statisticsApi.overview()
-  } catch {
-    overview.value = null
+  } catch(e) {
+    failure.value=errorMessage(e)
   }
 }
 
@@ -150,8 +156,8 @@ async function loadCategories() {
   try {
     categoryStats.value = await statisticsApi.expenseCategories(categoryTripId.value || undefined)
     renderPie()
-  } catch {
-    categoryStats.value = null
+  } catch(e) {
+    failure.value=errorMessage(e)
   }
 }
 
@@ -160,8 +166,8 @@ async function loadCosts() {
     const result = await statisticsApi.tripCosts(10)
     costItems.value = result.items
     renderBar()
-  } catch {
-    costItems.value = []
+  } catch(e) {
+    failure.value=errorMessage(e)
   }
 }
 
@@ -170,16 +176,16 @@ async function loadComparison() {
     const result = await statisticsApi.budgetComparison(10)
     comparisonItems.value = result.items
     renderCompare()
-  } catch {
-    comparisonItems.value = []
+  } catch(e) {
+    failure.value=errorMessage(e)
   }
 }
 
 async function loadTrips() {
   try {
     trips.value = await tripApi.options()
-  } catch {
-    trips.value = []
+  } catch(e) {
+    failure.value=errorMessage(e)
   }
 }
 
@@ -216,7 +222,7 @@ function renderBar() {
     xAxis: {
       type: 'category',
       data: titles,
-      axisLabel: { interval: 0, rotate: titles.length > 5 ? 25 : 0, fontSize: 11 },
+      axisLabel: { interval: 0, rotate: titles.length > 5 ? 25 : 0, fontSize: 14 },
       axisTick: { show: false }
     },
     yAxis: { type: 'value', name: '元', splitLine: { lineStyle: { type: 'dashed' } } },
@@ -255,7 +261,7 @@ function renderCompare() {
     xAxis: {
       type: 'category',
       data: titles,
-      axisLabel: { interval: 0, rotate: titles.length > 5 ? 25 : 0, fontSize: 11 },
+      axisLabel: { interval: 0, rotate: titles.length > 5 ? 25 : 0, fontSize: 14 },
       axisTick: { show: false }
     },
     yAxis: { type: 'value', name: '元', splitLine: { lineStyle: { type: 'dashed' } } },
@@ -281,6 +287,7 @@ function renderCompare() {
 }
 
 async function loadAll() {
+  failure.value=''
   loading.value = true
   try {
     await Promise.all([loadOverview(), loadCategories(), loadCosts(), loadComparison(), loadTrips()])
@@ -296,28 +303,28 @@ onMounted(loadAll)
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 16px;
-  margin: 16px 0;
+  gap:16px;
+  margin:16px 0;
 }
 
 .chart-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap:12px;
+  margin-bottom:8px;
   flex-wrap: wrap;
 }
 
 .chart-title {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin:0 0 4px;
+  font-size: var(--tp-font-body);
   font-weight: 600;
 }
 
 .chart-sub {
-  margin: 0;
-  font-size: 12px;
+  margin:0;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
 }
 
@@ -327,7 +334,7 @@ onMounted(loadAll)
   align-items: center;
   justify-content: center;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
 
 .chart-box--tall {

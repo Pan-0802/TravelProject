@@ -2,22 +2,22 @@
   <el-dialog
     :model-value="modelValue"
     :title="isEdit ? '编辑旅行' : '新建旅行'"
-    width="560px"
+    width="min(560px, 94vw)"
     :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="handleOpen"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="88px">
-      <el-form-item label="旅行名称" prop="title">
+      <el-form-item label="旅行名称" prop="title" :error="fieldErrors.title">
         <el-input v-model.trim="form.title" maxlength="120" show-word-limit placeholder="例如：重庆三日游" />
       </el-form-item>
 
-      <el-form-item label="目的地" prop="destination">
+      <el-form-item label="目的地" prop="destination" :error="fieldErrors.destination">
         <CitySelect v-model="form.destination" placeholder="请选择目的地城市" />
       </el-form-item>
 
-      <el-form-item label="出行日期" prop="dateRange">
+      <el-form-item label="出行日期" prop="dateRange" :error="fieldErrors.dateRange">
         <el-date-picker
           v-model="form.dateRange"
           type="daterange"
@@ -30,7 +30,7 @@
         <div class="form-tip">开始、结束日期均计入行程，共 {{ formDaysCount }} 天</div>
       </el-form-item>
 
-      <el-form-item label="预算" prop="totalBudget">
+      <el-form-item label="预算" prop="totalBudget" :error="fieldErrors.totalBudget">
         <el-input-number
           v-model="form.totalBudget"
           :min="0"
@@ -48,8 +48,9 @@
         type="info"
         :closable="false"
         show-icon
-        title="修改日期时，若已有行程或消费落在新日期范围之外，后端会拒绝保存（42200），请先调整子数据。"
+        title="修改日期前，请先调整范围之外的每日行程和消费记录，或保留能包含这些记录的出行日期。"
       />
+      <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" show-icon role="alert" />
     </el-form>
 
     <template #footer>
@@ -60,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { tripApi } from '@/api/trip'
@@ -70,6 +72,7 @@ import { daysBetween } from '@/utils/format'
 const props = defineProps<{
   modelValue: boolean
   trip?: Trip | null
+  prefill?: Partial<TripPayload>
 }>()
 
 const emit = defineEmits<{
@@ -80,6 +83,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => Boolean(props.trip?.tripId))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({ startDate: 'dateRange', endDate: 'dateRange' })
 
 const form = reactive({
   title: '',
@@ -115,23 +119,26 @@ const rules: FormRules = {
 }
 
 function handleOpen() {
+  clearErrors()
   if (props.trip) {
     form.title = props.trip.title
     form.destination = props.trip.destination
     form.dateRange = [props.trip.startDate, props.trip.endDate]
     form.totalBudget = Number(props.trip.totalBudget)
   } else {
-    form.title = ''
-    form.destination = ''
-    form.dateRange = []
-    form.totalBudget = 0
+    form.title = props.prefill?.title || ''
+    form.destination = props.prefill?.destination || ''
+    form.dateRange = props.prefill?.startDate && props.prefill.endDate ? [props.prefill.startDate, props.prefill.endDate] : []
+    form.totalBudget = Number(props.prefill?.totalBudget ?? 0)
   }
   formRef.value?.clearValidate()
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
+  clearErrors()
   const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!valid || submitting.value) return
 
   const payload: TripPayload = {
     title: form.title,
@@ -149,8 +156,8 @@ async function handleSubmit() {
     ElMessage.success(props.trip?.tripId ? '旅行已更新' : '旅行创建成功')
     emit('saved', saved)
     emit('update:modelValue', false)
-  } catch {
-    // 422/409 等错误由拦截器提示
+  } catch (error) {
+    showError(error)
   } finally {
     submitting.value = false
   }
@@ -159,14 +166,14 @@ async function handleSubmit() {
 
 <style scoped>
 .form-tip {
-  font-size: 12px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
   line-height: 1.6;
-  margin-top: 4px;
+  margin-top:4px;
 }
 
 .form-tip--inline {
-  margin-top: 0;
-  margin-left: 8px;
+  margin-top:0;
+  margin-left:8px;
 }
 </style>

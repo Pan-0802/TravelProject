@@ -21,7 +21,7 @@
       size="large"
       @submit.prevent="handleSubmit"
     >
-      <el-form-item label="用户名" prop="username">
+      <el-form-item label="用户名" prop="username" :error="fieldErrors.username">
         <el-input
           v-model.trim="form.username"
           placeholder="请输入用户名"
@@ -31,7 +31,7 @@
         />
       </el-form-item>
 
-      <el-form-item label="密码" prop="password">
+      <el-form-item label="密码" prop="password" :error="fieldErrors.password">
         <el-input
           v-model="form.password"
           type="password"
@@ -52,7 +52,8 @@
       >
         登录
       </el-button>
-    </el-form>
+    <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" role="alert" />
+</el-form>
 
     <div class="auth-card__footer">
       <span>还没有账号？</span>
@@ -62,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
@@ -73,6 +75,7 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const formRef = ref<FormInstance>()
+const {fieldErrors,submitError,clearErrors,showError}=useFormErrors()
 const loading = ref(false)
 const isMock = import.meta.env.VITE_USE_MOCK === 'true'
 
@@ -84,6 +87,7 @@ const rules: FormRules = {
 }
 
 async function handleSubmit() {
+  clearErrors()
   if (loading.value) return
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -94,8 +98,8 @@ async function handleSubmit() {
     ElMessage.success('登录成功')
     const redirect = (route.query.redirect as string) || '/trips'
     await router.replace(redirect)
-  } catch {
-    // 错误提示已由拦截器统一处理
+  } catch (error) {
+    showError(error)
   } finally {
     loading.value = false
   }
@@ -110,33 +114,33 @@ onMounted(() => {
 
 <style scoped>
 .auth-card__title {
-  margin: 0 0 6px;
-  font-size: 24px;
+  margin:0 0 4px;
+  font-size: var(--tp-font-title);
   font-weight: 700;
 }
 
 .auth-card__subtitle {
-  margin: 0 0 22px;
+  margin:0 0 24px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
 
 .auth-card__alert {
-  margin-bottom: 18px;
+  margin-bottom:16px;
 }
 
 .auth-card__submit {
   width: 100%;
-  margin-top: 4px;
+  margin-top:4px;
 }
 
 .auth-card__footer {
-  margin-top: 18px;
+  margin-top:16px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
   display: flex;
   justify-content: center;
-  gap: 6px;
+  gap:4px;
 }
 </style>

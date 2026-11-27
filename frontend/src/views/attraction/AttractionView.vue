@@ -10,6 +10,8 @@
       <el-button type="primary" :icon="Plus" @click="openCreate">新增自建景点</el-button>
     </div>
 
+    <el-alert v-if="contextTrip" type="info" :closable="false" :title="'正在为「'+contextTrip.title+'」挑选景点，保存后可直接安排到某一天。'" style="margin-bottom:16px"><el-button text type="primary" @click="router.push('/trips/'+contextTrip.tripId)">返回旅行</el-button></el-alert>
+    <div v-if="recentAttraction" class="tp-card tp-card__body" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>「{{ recentAttraction.name }}」已保存，接下来安排到哪一天？</span><el-button type="primary" @click="addToTrip(recentAttraction)">加入旅行行程</el-button></div>
     <!-- 高德实时 POI -->
     <div class="tp-card tp-card__body">
       <div class="section-head">
@@ -35,7 +37,8 @@
         <el-button type="primary" :loading="poiLoading" @click="searchPoi">搜索</el-button>
       </div>
 
-      <div v-loading="poiLoading" class="poi-area">
+      <RequestError :message="poiFailure" :loading="poiLoading" @retry="searchPoi"/>
+      <div v-if="!poiFailure" v-loading="poiLoading" class="poi-area">
         <el-empty
           v-if="!poiLoading && poiList.length === 0"
           :description="poiSearched ? '没有找到相关地点，换个关键词试试' : '输入关键词与城市，查询高德实时地点'"
@@ -93,72 +96,35 @@
         <el-button :icon="Refresh" text @click="loadAttractions">刷新</el-button>
       </div>
 
-      <div v-loading="attrLoading">
-        <el-empty
-          v-if="!attrLoading && attractions.length === 0"
-          description="还没有本地景点，点击右上角“新增自建景点”创建"
-        />
-
-        <div v-else class="attr-grid">
-          <div v-for="item in attractions" :key="item.attractionId" class="attr-card">
-            <div class="attr-card__head">
-              <h3 class="attr-card__name" @click="openDetail(item)">{{ item.name }}</h3>
-              <el-tag v-if="item.isOwner" size="small" effect="plain" type="success">我创建的</el-tag>
-            </div>
-
-            <div class="attr-card__tags">
-              <el-tag size="small" effect="plain">{{ item.city }}</el-tag>
-              <el-tag v-if="item.category" size="small" effect="plain" type="info">{{ item.category }}</el-tag>
-            </div>
-
-            <p class="attr-card__desc">{{ item.description || '暂无描述' }}</p>
-
-            <div class="attr-card__meta">
-              <span><el-icon><Clock /></el-icon>{{ durationText(item.suggestedDurationMinutes) }}</span>
-              <span><el-icon><Ticket /></el-icon>{{ item.referenceTicketPrice === null ? '未填' : money(item.referenceTicketPrice) }}</span>
-            </div>
-
-            <div class="attr-card__actions">
-              <el-button size="small" text type="primary" @click="openDetail(item)">详情</el-button>
-              <el-button
-                size="small"
-                text
-                :type="item.isFavorited ? 'warning' : 'primary'"
-                :loading="favoriteLoadingId === item.attractionId"
-                @click="toggleFavorite(item)"
-              >
-                {{ item.isFavorited ? '取消收藏' : '收藏' }}
-              </el-button>
-              <template v-if="item.isOwner">
-                <el-button size="small" text @click="openEdit(item)">编辑</el-button>
-                <el-button size="small" text type="danger" @click="removeAttraction(item)">删除</el-button>
-              </template>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="attrQuery.page"
-          v-model:page-size="attrQuery.size"
-          :total="attractionTotal"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          background
-          @current-change="loadAttractions"
-          @size-change="handleAttrSizeChange"
-        />
-      </div>
+      <RequestError :message="attrFailure" :loading="attrLoading" @retry="loadAttractions"/>
+      <el-table v-if="!attrFailure" v-loading="attrLoading" :data="attractions" stripe row-key="attractionId">
+        <el-table-column prop="name" label="景点名称" min-width="200" show-overflow-tooltip/>
+        <el-table-column prop="city" label="城市" min-width="120" show-overflow-tooltip/>
+        <el-table-column prop="category" label="分类" min-width="120" show-overflow-tooltip/>
+        <el-table-column label="建议游玩" width="144" align="right"><template #default="{row}">{{durationText(row.suggestedDurationMinutes)}}</template></el-table-column>
+        <el-table-column label="参考门票" width="128" align="right"><template #default="{row}">{{row.referenceTicketPrice===null?'未填写':money(row.referenceTicketPrice)}}</template></el-table-column>
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip/>
+        <el-table-column label="操作" width="88" fixed="right"><template #default="{row}"><el-button link type="primary" @click="openDetail(row)">详情</el-button></template></el-table-column>
+        <template #empty><el-empty :description="attrQuery.keyword||attrQuery.city||attrQuery.mineOnly?'没有匹配的记录，请调整或清空检索条件':'暂无本地景点，搜索录入或新增一个吧'"><el-button @click="resetAttrQuery">清空条件</el-button></el-empty></template>
+      </el-table>
+      <ListPagination v-if="!attrFailure" :page="attrQuery.page" :total="attractionTotal" @change="page=>{attrQuery.page=page;loadAttractions()}"/>
     </div>
 
     <AttractionFormDialog v-model="formVisible" :attraction="editingAttraction" :prefill="poiSeed" @saved="handleSaved" />
-    <AttractionDetailDialog v-model="detailVisible" :attraction="detailAttraction" />
+    <AttractionDetailDialog v-model="detailVisible" :attraction="detailAttraction" :default-trip-id="contextTrip?.tripId" @changed="loadAttractions" />
+    <AddToTripDialog v-model="addVisible" :attraction="addingAttraction" :default-trip-id="contextTrip?.tripId" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import ListPagination from '@/components/common/ListPagination.vue'
+import RequestError from '@/components/common/RequestError.vue'
+import {errorMessage} from '@/utils/request'
+import {useRoute,useRouter} from 'vue-router'
+import {tripApi} from '@/api/trip'
+import type {Trip} from '@/types/api'
+import AddToTripDialog from '@/components/attraction/AddToTripDialog.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, Location, Plus, Refresh, Search, Ticket } from '@element-plus/icons-vue'
 import { attractionApi } from '@/api/attraction'
@@ -176,6 +142,7 @@ const poiQuery = reactive({ keywords: '', region: '', cityLimit: true })
 const poiList = ref<PoiItem[]>([])
 const poiLoading = ref(false)
 const poiSearched = ref(false)
+const poiFailure=ref('')
 
 async function searchPoi() {
   if (!poiQuery.keywords) {
@@ -187,6 +154,7 @@ async function searchPoi() {
     return
   }
   poiLoading.value = true
+  poiFailure.value=''
   try {
     const result = await poiApi.search({
       keywords: poiQuery.keywords,
@@ -197,8 +165,8 @@ async function searchPoi() {
     })
     poiList.value = result.list || []
     poiSearched.value = true
-  } catch {
-    poiList.value = []
+  } catch(e) {
+    poiFailure.value=errorMessage(e)
   } finally {
     poiLoading.value = false
   }
@@ -214,6 +182,7 @@ function createFromPoi(poi: PoiItem) {
 const attractions = ref<Attraction[]>([])
 const attractionTotal = ref(0)
 const attrLoading = ref(false)
+const attrFailure=ref('');let attrSequence=0
 const formVisible = ref(false)
 const editingAttraction = ref<Attraction | null>(null)
 const poiSeed = ref<Partial<AttractionPayload> | null>(null)
@@ -223,14 +192,16 @@ const favoriteLoadingId = ref('')
 
 const attrQuery = reactive({
   page: 1,
-  size: 12,
+  size: 20,
   keyword: '',
   city: '',
   mineOnly: false
 })
 
 async function loadAttractions() {
+  const run=++attrSequence
   attrLoading.value = true
+  attrFailure.value=''
   try {
     const result = await attractionApi.list({
       page: attrQuery.page,
@@ -239,13 +210,13 @@ async function loadAttractions() {
       city: attrQuery.city,
       mineOnly: attrQuery.mineOnly
     })
+    if(run!==attrSequence)return
     attractions.value = result.list
     attractionTotal.value = result.total
-  } catch {
-    attractions.value = []
-    attractionTotal.value = 0
+  } catch(e) {
+    if(run===attrSequence)attrFailure.value=errorMessage(e)
   } finally {
-    attrLoading.value = false
+    if(run===attrSequence)attrLoading.value = false
   }
 }
 
@@ -283,52 +254,19 @@ function openDetail(item: Attraction) {
   detailVisible.value = true
 }
 
-function handleSaved() {
+function handleSaved(saved:Attraction) {
   attrQuery.page = 1
   loadAttractions()
+  if(!editingAttraction.value){recentAttraction.value=saved;openDetail(saved)}
 }
 
-async function toggleFavorite(item: Attraction) {
-  favoriteLoadingId.value = item.attractionId
-  try {
-    if (item.isFavorited) {
-      await favoriteApi.remove(item.attractionId)
-      item.isFavorited = false
-      ElMessage.success('已取消收藏')
-    } else {
-      await favoriteApi.add(item.attractionId)
-      item.isFavorited = true
-      ElMessage.success('收藏成功')
-    }
-  } catch {
-    // 409（重复收藏）等情况下刷新列表，保证状态与后端一致
-    loadAttractions()
-  } finally {
-    favoriteLoadingId.value = ''
-  }
-}
-
-async function removeAttraction(item: Attraction) {
-  try {
-    await ElMessageBox.confirm(
-      `删除「${item.name}」后，相关收藏会被一并删除；已有行程中的活动名称会保留，但不再关联该景点。确定删除吗？`,
-      '删除景点',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
-  } catch {
-    return
-  }
-  try {
-    await attractionApi.remove(item.attractionId)
-    ElMessage.success('景点已删除')
-    if (attractions.value.length === 1 && attrQuery.page > 1) attrQuery.page -= 1
-    loadAttractions()
-  } catch {
-    // 403/404 由拦截器提示
-  }
-}
 
 onMounted(loadAttractions)
+const route=useRoute(),router=useRouter(),contextTrip=ref<Trip|null>(null)
+const addVisible=ref(false),addingAttraction=ref<Attraction|null>(null)
+const recentAttraction=ref<Attraction|null>(null)
+function addToTrip(attraction:Attraction){addingAttraction.value=attraction;addVisible.value=true}
+onMounted(async()=>{if(route.query.tripId){try{contextTrip.value=await tripApi.detail(String(route.query.tripId));poiQuery.region=contextTrip.value.destination;attrQuery.city=contextTrip.value.destination;loadAttractions()}catch{/* keep standalone exploration available */}}})
 </script>
 
 <style scoped>
@@ -336,20 +274,20 @@ onMounted(loadAttractions)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap:12px;
+  margin-bottom:12px;
   flex-wrap: wrap;
 }
 
 .section-title {
-  margin: 0 0 4px;
-  font-size: 16px;
+  margin:0 0 4px;
+  font-size: var(--tp-font-section);
   font-weight: 600;
 }
 
 .section-desc {
-  margin: 0;
-  font-size: 12px;
+  margin:0;
+  font-size: var(--tp-font-title);
   color: var(--tp-text-secondary);
 }
 
@@ -360,18 +298,18 @@ onMounted(loadAttractions)
 .poi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap:12px;
 }
 
 .poi-card {
   min-width: 0;
   border: 1px solid var(--tp-border);
   border-radius: 10px;
-  padding: 14px;
+  padding:12px;
   background: #fbfcff;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap:8px;
 }
 
 .poi-card__head {
@@ -379,7 +317,7 @@ onMounted(loadAttractions)
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap:8px;
 }
 
 .poi-card__name {
@@ -390,8 +328,8 @@ onMounted(loadAttractions)
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin: 0;
-  font-size: 15px;
+  margin:0;
+  font-size: var(--tp-font-body);
   font-weight: 600;
   line-height: 1.4;
 }
@@ -404,21 +342,21 @@ onMounted(loadAttractions)
 }
 
 .poi-card__addr {
-  margin: 0;
-  font-size: 12px;
+  margin:0;
+  font-size: var(--tp-font-title);
   color: var(--tp-text-secondary);
   display: flex;
-  gap: 4px;
+  gap:4px;
   line-height: 1.6;
 }
 
 .poi-card__meta {
-  margin: 0;
-  font-size: 12px;
-  color: #8b98ac;
+  margin:0;
+  font-size: var(--tp-font-title);
+  color:var(--tp-text-secondary);
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap:8px;
   flex-wrap: wrap;
 }
 
@@ -433,17 +371,17 @@ onMounted(loadAttractions)
 .attr-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  gap:12px;
 }
 
 .attr-card {
   border: 1px solid var(--tp-border);
   border-radius: 12px;
-  padding: 16px;
+  padding:16px;
   background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap:8px;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
@@ -456,12 +394,12 @@ onMounted(loadAttractions)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap:8px;
 }
 
 .attr-card__name {
-  margin: 0;
-  font-size: 16px;
+  margin:0;
+  font-size: var(--tp-font-section);
   font-weight: 600;
   cursor: pointer;
   line-height: 1.4;
@@ -473,13 +411,13 @@ onMounted(loadAttractions)
 
 .attr-card__tags {
   display: flex;
-  gap: 6px;
+  gap:4px;
   flex-wrap: wrap;
 }
 
 .attr-card__desc {
-  margin: 0;
-  font-size: 12px;
+  margin:0;
+  font-size: var(--tp-font-title);
   color: var(--tp-text-secondary);
   line-height: 1.7;
   display: -webkit-box;
@@ -491,29 +429,29 @@ onMounted(loadAttractions)
 
 .attr-card__meta {
   display: flex;
-  gap: 16px;
-  font-size: 12px;
+  gap:16px;
+  font-size: var(--tp-font-title);
   color: var(--tp-text-secondary);
 }
 
 .attr-card__meta span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap:4px;
 }
 
 .attr-card__actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap:4px;
   border-top: 1px dashed var(--tp-border);
-  padding-top: 8px;
-  margin-top: auto;
+  padding-top:8px;
+  margin-top:auto;
 }
 
 .pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top:16px;
 }
 </style>

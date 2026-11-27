@@ -33,16 +33,20 @@ public class WriteSupport {
     }
     public void validate(Object dto) {
         var errors = validator.validate(dto);
-        if (!errors.isEmpty()) throw new BusinessException(400, errors.iterator().next().getPropertyPath()+" 参数不合法");
+        if (!errors.isEmpty()) {
+            var fields=new java.util.LinkedHashMap<String,String>();
+            errors.forEach(error -> fields.putIfAbsent(error.getPropertyPath().toString(),"请检查此项："+error.getMessage()));
+            throw new BusinessException(400,"部分内容不合法，请按字段提示修改后保存",fields);
+        }
     }
     public static void range(LocalDate start, LocalDate end) {
-        if (end.isBefore(start)) throw new BusinessException(422,"结束日期不能早于开始日期");
+        if (end.isBefore(start)) throw new BusinessException(422,"结束日期不能早于开始日期",java.util.Map.of("endDate","请选择不早于开始日期的结束日期"));
     }
     public static void inRange(LocalDate date, LocalDate start, LocalDate end) {
-        if (date.isBefore(start) || date.isAfter(end)) throw new BusinessException(422,"日期必须在旅行期间内");
+        if (date.isBefore(start) || date.isAfter(end)) throw new BusinessException(422,"日期必须在旅行期间内",java.util.Map.of("spentOn","请选择旅行起止日期之间的日期","date","请选择旅行起止日期之间的日期"));
     }
     public static void password(String value, String confirm) {
         if (!value.equals(confirm) || value.getBytes(StandardCharsets.UTF_8).length > 72)
-            throw new BusinessException(400,"确认密码不一致或密码超过 72 字节");
+            throw new BusinessException(400,"确认密码不一致或密码超过 72 字节",java.util.Map.of("confirmPassword","请与密码保持一致；含中文的密码请缩短，UTF-8总长度不能超过72字节"));
     }
 }

@@ -79,4 +79,33 @@ class AiClientTest {
         reply.set(new Reply(200,"{}",2500));
         assertThatThrownBy(() -> client("test-key",1).generate(request())).isInstanceOfSatisfying(BusinessException.class,e -> assertThat(e.status).isEqualTo(504));
     }
+    @Test void chatSendsRoleHistoryAndCurrentEditedPlan() throws Exception {
+        String content="{\"reply\":\"保留原方案，这样安排可以少走路\",\"memory\":\"带老人，少走路\",\"plan\":null}";
+        String envelope=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("choices",List.of(java.util.Map.of("message",java.util.Map.of("content",content)))));
+        reply.set(new Reply(200,envelope,0));
+        var context=new com.travel.dto.ChatRequests.Context(request(),null,"带老人","ASK",List.of(
+            new com.travel.dto.ChatRequests.Message("user","想少走路"),
+            new com.travel.dto.ChatRequests.Message("assistant","我会减少转场"),
+            new com.travel.dto.ChatRequests.Message("user","为什么这样安排？")));
+        var answer=client("test-key",2).reply(context);
+        assertThat(answer.plan()).isNull();
+        var sent=new com.fasterxml.jackson.databind.ObjectMapper().readTree(received.get());
+        assertThat(sent.path("messages").size()).isEqualTo(4);
+        assertThat(sent.path("messages").get(2).path("role").asText()).isEqualTo("assistant");
+        assertThat(sent.path("messages").get(0).path("content").asText()).contains("带老人","ASK");
+    }
+    @Test void chatBlankContentIsReportedWithoutAutomaticRetry() {
+        reply.set(new Reply(200,"{\"choices\":[{\"message\":{\"content\":\"   \"}}]}",0));
+        var context=new com.travel.dto.ChatRequests.Context(request(),null,"","ASK",List.of(new com.travel.dto.ChatRequests.Message("user","解释一下")));
+        assertThatThrownBy(()->client("test-key",2).reply(context)).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.status).isEqualTo(502));
+    }
+    @Test void fourDayRevisionHasEnoughOutputBudgetAndKeepsProviderReasoningDefault() throws Exception {
+        String content="{\"reply\":\"合成验收回复\",\"memory\":\"\",\"plan\":null}";
+        reply.set(new Reply(200,new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("choices",List.of(java.util.Map.of("finish_reason","stop","message",java.util.Map.of("content",content))))),0));
+        var conditions=new Generate(null,"北京",LocalDate.parse("2026-12-10"),LocalDate.parse("2026-12-13"),4,new BigDecimal("2000"),null,List.of(),null);
+        client("test-key",2).reply(new com.travel.dto.ChatRequests.Context(conditions,null,"","REVISE",List.of(new com.travel.dto.ChatRequests.Message("user","增加具体餐饮地点"))));
+        var sent=new com.fasterxml.jackson.databind.ObjectMapper().readTree(received.get());
+        assertThat(sent.path("max_tokens").asInt()).isEqualTo(10848);
+        assertThat(sent.has("reasoning_effort")).isFalse();
+    }
 }

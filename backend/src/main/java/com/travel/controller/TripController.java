@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TripController {
     private final TripService trips;
-    @GetMapping public ApiResponse<?> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="10") int size,
+    @GetMapping public ApiResponse<?> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int size,
         @RequestParam(required=false) String keyword,@RequestParam(required=false) String status) { return ApiResponse.ok(trips.list(page,size,keyword,status)); }
     @PostMapping @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public ApiResponse<?> create(@Valid @RequestBody TripWrite dto) { return ApiResponse.ok(trips.create(dto)); }

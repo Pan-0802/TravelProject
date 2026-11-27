@@ -18,6 +18,7 @@ async function session(page: Page) {
   await page.route('**/api/users/me', r => r.fulfill({ json: envelope({ userId: '1', username: 'boundary', nickname: '边界验收' }) }))
   await page.route('**/api/attractions?*', r => r.fulfill({ json: envelope({ list: [], total: 0, page: 1, size: 50 }) }))
   await page.route('**/api/ai/plans?*', r => r.fulfill({ json: envelope({ list: [], total: 0, page: 1, size: 8 }) }))
+  await page.route('**/api/ai/conversations?*', r => r.fulfill({ json: envelope({ list: [], total: 0, page: 1, size: 10 }) }))
 }
 
 test('选项超过50条仍能关联第51条旅行', async ({ page }) => {
@@ -30,8 +31,8 @@ test('选项超过50条仍能关联第51条旅行', async ({ page }) => {
     return route.fulfill({ json: envelope({ list, total: 51, page: pageNumber, size: 50 }) })
   })
   await page.goto('/ai?tripId=951')
-  await expect(page.locator('.chat-body')).toContainText('旅行951')
-  await expect(page.locator('.chat-chips').first()).toBeVisible()
+  await expect(page.locator('.planner-page')).toContainText('旅行951')
+  await expect(page.getByPlaceholder('开始日期')).toHaveValue('2026-12-01')
   expect(pages).toEqual([1, 2])
 })
 

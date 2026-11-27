@@ -59,6 +59,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI 智能规划', requiresAuth: true }
       },
       {
+        path: 'ai/chat/:conversationId',
+        name: 'AiConversation',
+        component: () => import('@/views/ai/AiConversationView.vue'),
+        meta: { title: '旅行规划对话', requiresAuth: true, activeMenu: '/ai' }
+      },
+      {
         path: 'ai/result/:aiPlanId',
         name: 'AiResult',
         component: () => import('@/views/ai/AiResultView.vue'),

@@ -39,3 +39,16 @@ CREATE TABLE IF NOT EXISTS ai_plan_record (
  trip_id BIGINT REFERENCES trip(trip_id) ON DELETE SET NULL,request_json TEXT NOT NULL,response_json TEXT,
  estimated_total DECIMAL(12,2),status VARCHAR(12) NOT NULL,error_message VARCHAR(500),created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,saved_at TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS ai_conversation (
+ conversation_id BIGINT AUTO_INCREMENT PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES `user`(user_id) ON DELETE CASCADE,
+ title VARCHAR(120) NOT NULL,conditions_json TEXT NOT NULL,current_plan_id BIGINT REFERENCES ai_plan_record(ai_plan_id) ON DELETE SET NULL,
+ current_days_json TEXT,memory TEXT NOT NULL,version BIGINT DEFAULT 0 NOT NULL,active_request_id VARCHAR(64),started_at TIMESTAMP,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS ai_chat_message (
+ message_id BIGINT AUTO_INCREMENT PRIMARY KEY,conversation_id BIGINT NOT NULL REFERENCES ai_conversation(conversation_id) ON DELETE CASCADE,
+ request_id VARCHAR(64) NOT NULL,role VARCHAR(12) NOT NULL,content TEXT NOT NULL,status VARCHAR(12) NOT NULL,error_message VARCHAR(255),
+ plan_id BIGINT REFERENCES ai_plan_record(ai_plan_id) ON DELETE SET NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE(conversation_id,request_id,role)
+);

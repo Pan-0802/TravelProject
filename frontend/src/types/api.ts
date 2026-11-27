@@ -114,6 +114,7 @@ export interface AttractionPayload {
 
 /** 高德实时 POI（不落库，ID 不可当 attractionId 使用） */
 export interface PoiItem {
+  id?: string
   name: string
   address: string | null
   city: string | null
@@ -248,6 +249,7 @@ export interface AiPlanDay {
 }
 
 export interface AiPlanRequest {
+  referenceDays?: AiPlanDay[] | null
   tripId: string | null
   destination: string
   startDate: string
@@ -291,6 +293,7 @@ export interface AiPlanQuery extends PageQuery {
 }
 
 export interface AiGeneratePayload {
+  referenceDays?: AiPlanDay[] | null
   tripId: string | null
   destination: string
   startDate: string

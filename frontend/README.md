@@ -43,7 +43,7 @@ Mock 模式下所有数据保存在浏览器 `localStorage`，刷新不丢；控
 | `npm run build` | 先做类型检查，再生产构建，产物在 `dist/` |
 | `npm run preview` | 在 4173 预览构建产物，使用相同的后端代理 |
 | `npm run type-check` | 单独运行 `vue-tsc` 类型检查 |
-| `npm run test:e2e` | 原9项及新增2项景点预填场景，默认独立前端5175、后端18080；完整运行包含真实AI调用 |
+| `npm run test:e2e` | 当前29项场景，默认独立前端5175、后端18080；完整运行包含真实AI与三轮聊天调用 |
 | `npm run test:boundaries` | 3 项受控响应的前端边界测试，无真实AI调用，不需要后端 |
 
 后端不在本机时，在 `.env.development.local` 中写 `VITE_PROXY_TARGET=http://后端电脑IP:8080`，或在 PowerShell 设置进程环境变量；代理配置会读取当前模式的 `.env` 文件：
@@ -166,3 +166,38 @@ npm run test:boundaries
 ```
 
 浏览器验收使用已安装的Microsoft Edge，独立前端端口5175。完整测试会创建 `ui_accept_`、`ui_profile_`、`ui_crud_` 开头的测试账号，真实AI生成一次，数据与原演示账号隔离；不清空原有数据库。报告在 `playwright-report/` 和 `test-results/`，均被Git忽略。公开部署仍需配置生产Web服务器的 `/api` 反向代理和SPA路由回退；Vite开发代理及preview仅供本机联调。
+
+## 十、当前 AI 聊天与行程界面（2026-11-25）
+
+- 左侧连续聊天，右侧为`PlanTimeline`单日时间线。日期标签支持点击、方向键和Home/End切换；只展示当前一天。
+- 时间线默认显示活动名称、时间、预计费用、到达方式和简短备注。点击“编辑”后打开弹窗，取消不改草稿，“应用修改”才更新预览。
+- 支持添加、上下调整、移除、撤销上次修改、编辑当天说明。日期切换不会丢失已应用修改；发送时带入全部天数的编辑快照。
+- 手工活动填写开始时间后自动插入当天对应位置，修改开始时间会重新归位。正式行程、景点探索加入行程和AI草稿都使用这条规则；未填开始时间先放末尾。已有错序或主动调整过顺序时可以点“按时间整理”恢复时间顺序。时间重叠仅提示，不自动改动原有安排或补造结束时间。
+- “让 AI 调整这一天”填入明确日期并选择调整模式，仍需用户主动发送，不自动产生模型请求。
+- “确认保存到旅行”写入正式行程；未选择旅行时打开选择弹窗，可就地创建匹配旅行。已有行程覆盖确认和实际消费隔离继续保留。
+- 发送时每2.5秒查询状态，等待期间可以主动查询；失败后保留输入和草稿，同内容重试合并显示。
+
+## 十一、已移除距离预估
+
+聊天、旧方案页与正式行程页均移除距离核验入口、候选地点列表和路程失败卡片。`RouteOverview.vue`、前端路径API及后端两条路径端点已删除。高德POI实时搜索与景点录入保留；页面不会再请求`/api/pois/route`或`/api/pois/routes`。
+
+## 十二、协作与验证
+
+首次启用多轮会话的电脑仍需要执行`ER图和Mysql/04_AI多轮会话_增量升级.sql`；已执行过04的电脑本轮无需再运行SQL。更新后重启后端TravelApplication，前端在原运行终端Ctrl+C后执行`npm run dev`。
+
+受控浏览器检查：`npm run test:e2e -- conversation.spec.ts planning-ux.spec.ts`，覆盖按天浏览、编辑取消、错误时间、顺序和撤销、添加及费用、下一轮完整快照、失败恢复，以及已删除模块不再发请求。
+
+`chat-live.spec.ts`和`four-day-live.spec.ts`使用新账号和合成行程，验证真实模型生成、只问问题、参考编辑调整、保存覆盖、实际消费隔离与历史恢复。运行会使用已配置的服务并创建测试数据：
+
+```powershell
+.\scripts\Test-Integration.ps1 -TestFile @('chat-live.spec.ts','four-day-live.spec.ts') -JavaHome 'JDK根目录'
+```
+
+旧的acceptance路线图片及验收文件是历史记录，不代表当前版本仍有距离模块。
+
+当前版验证：生产构建通过；完整36项浏览器回归通过，新增会话隔离及重庆长行程场景后，对全部26项聊天/规划UI再次回归通过，共覆盖39个不同场景。真实四天方案从18项调整为22项并保存，原31元测试消费保留。详见[本次验收记录](acceptance/ux-simplification-2026-11-25.json)、[重庆新版界面](acceptance/ai-chongqing-redesign.png)与[窄屏编辑弹窗](acceptance/ai-activity-editor-mobile.png)。
+
+手工时间归位检查：`scripts/Test-Integration.ps1 -TestFile @('schedule.spec.ts','conversation.spec.ts') -JavaHome 'JDK根目录'`。`schedule.spec.ts`在独立账号的真实数据库中验证16点插入、改时间后归位、刷新后持久化、所选日期/关联景点/建议时长、旧记录整理与消费保留，不调用AI。
+
+
+课程最终启动和完整10表初始化请以根目录README及schema.sql为准。新增本地配置启动入口：backend/scripts/Start-Backend.ps1。

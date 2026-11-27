@@ -2,7 +2,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="isEdit ? '编辑自建景点' : '新增自建景点'"
-    width="600px"
+    width="min(600px, 94vw)"
     :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
@@ -17,15 +17,15 @@
     />
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
-      <el-form-item label="景点名称" prop="name">
+      <el-form-item label="景点名称" prop="name" :error="fieldErrors.name">
         <el-input v-model.trim="form.name" maxlength="120" show-word-limit placeholder="例如：李子坝观景平台" />
       </el-form-item>
 
-      <el-form-item label="所在城市" prop="city">
+      <el-form-item label="所在城市" prop="city" :error="fieldErrors.city">
         <CityCascader v-model="form.city" placeholder="先选省，再选市" />
       </el-form-item>
 
-      <el-form-item label="分类" prop="category">
+      <el-form-item label="分类" prop="category" :error="fieldErrors.category">
         <el-input v-model.trim="form.category" maxlength="40" placeholder="例如：观景 / 美食 / 博物馆" />
       </el-form-item>
 
@@ -65,6 +65,7 @@
           placeholder="记录你自己的游玩经验、注意事项等"
         />
       </el-form-item>
+      <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" show-icon role="alert" />
     </el-form>
 
     <template #footer>
@@ -75,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { attractionApi } from '@/api/attraction'
@@ -95,6 +97,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => Boolean(props.attraction?.attractionId))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({})
 
 const form = reactive({
   name: '',
@@ -118,6 +121,7 @@ const rules: FormRules = {
 }
 
 function handleOpen() {
+  clearErrors()
   const item = props.attraction || props.prefill
   form.name = item?.name || ''
   form.city = item?.city || ''
@@ -129,8 +133,10 @@ function handleOpen() {
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
+  clearErrors()
   const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!valid || submitting.value) return
 
   const duration = Number(form.suggestedDurationMinutes)
   if (duration < 0 || duration > 65535 || !Number.isInteger(duration)) {
@@ -156,8 +162,8 @@ async function handleSubmit() {
       : props.prefill ? `「${saved.name}」已录入，可在每日行程的“关联景点”中选择` : '景点已创建')
     emit('saved', saved)
     emit('update:modelValue', false)
-  } catch {
-    // 400/403 由拦截器提示
+  } catch (error) {
+    showError(error)
   } finally {
     submitting.value = false
   }
@@ -166,12 +172,12 @@ async function handleSubmit() {
 
 <style scoped>
 .dialog-alert {
-  margin-bottom: 16px;
+  margin-bottom:16px;
 }
 
 .unit {
-  margin-left: 8px;
-  font-size: 12px;
+  margin-left:8px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
 }
 </style>

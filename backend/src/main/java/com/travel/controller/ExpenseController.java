@@ -14,7 +14,7 @@ import java.time.LocalDate;
 public class ExpenseController {
     private final ExpenseService expenses;
     @GetMapping("/api/trips/{tripId}/expenses") public ApiResponse<?> list(@PathVariable Long tripId,
-        @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="10") int size,@RequestParam(required=false) Category category,
+        @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int size,@RequestParam(required=false) Category category,
         @RequestParam(required=false) LocalDate startDate,@RequestParam(required=false) LocalDate endDate) { return ApiResponse.ok(expenses.list(tripId,page,size,category,startDate,endDate)); }
     @PostMapping("/api/trips/{tripId}/expenses") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public ApiResponse<?> create(@PathVariable Long tripId,@Valid @RequestBody ExpenseWrite dto) { return ApiResponse.ok(expenses.create(tripId,dto)); }

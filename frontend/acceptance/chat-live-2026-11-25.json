@@ -1,0 +1,14 @@
+{
+  "username": "chat_live_1795589978251",
+  "conversationId": "17",
+  "tripId": "47",
+  "firstPlanId": "32",
+  "latestPlanId": "33",
+  "turns": 3,
+  "messageCount": 6,
+  "questionKeptPlan": true,
+  "editedDaysSent": true,
+  "savedAfterConfirmation": true,
+  "actualExpensePreserved": 27,
+  "historyRestored": true
+}

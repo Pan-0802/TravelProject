@@ -2,14 +2,14 @@
   <el-dialog
     :model-value="modelValue"
     :title="isEdit ? '编辑消费' : '记录消费'"
-    width="540px"
+    width="min(540px, 94vw)"
     :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="handleOpen"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="84px">
-      <el-form-item label="消费类别" prop="category">
+      <el-form-item label="消费类别" prop="category" :error="fieldErrors.category">
         <el-select v-model="form.category" placeholder="请选择类别" style="width: 100%">
           <el-option
             v-for="item in EXPENSE_CATEGORIES"
@@ -23,7 +23,7 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="金额" prop="amount">
+      <el-form-item label="金额" prop="amount" :error="fieldErrors.amount">
         <el-input-number
           v-model="form.amount"
           :min="0.01"
@@ -36,7 +36,7 @@
         <span class="unit">元</span>
       </el-form-item>
 
-      <el-form-item label="消费日期" prop="spentOn">
+      <el-form-item label="消费日期" prop="spentOn" :error="fieldErrors.spentOn">
         <el-date-picker
           v-model="form.spentOn"
           type="date"
@@ -58,6 +58,7 @@
           placeholder="例如：午餐、地铁充值"
         />
       </el-form-item>
+      <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" show-icon role="alert" />
     </el-form>
 
     <template #footer>
@@ -68,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormErrors } from "@/utils/formErrors"
 import { computed, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
@@ -80,20 +82,22 @@ const props = defineProps<{
   modelValue: boolean
   trip: Trip
   expense?: Expense | null
+  prefill?: { spentOn: string; description: string }
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'saved'): void
+  (e: 'saved', expense: Expense, created: boolean): void
 }>()
 
 const isEdit = computed(() => Boolean(props.expense?.expenseId))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({})
 
 const form = reactive({
   category: 'FOOD' as ExpenseCategory,
-  amount: 0,
+  amount: undefined as number | undefined,
   spentOn: '',
   description: ''
 })
@@ -131,11 +135,12 @@ function isDisabledDate(date: Date) {
 }
 
 function handleOpen() {
+  clearErrors()
   const expense = props.expense
-  form.category = expense?.category || 'FOOD'
-  form.amount = Number(expense?.amount ?? 0)
-  form.spentOn = expense?.spentOn || defaultDate()
-  form.description = expense?.description || ''
+  form.category = expense?.category || (props.prefill ? 'OTHER' : 'FOOD')
+  form.amount = expense ? Number(expense.amount) : undefined
+  form.spentOn = expense?.spentOn || props.prefill?.spentOn || defaultDate()
+  form.description = expense?.description || props.prefill?.description || ''
   formRef.value?.clearValidate()
 }
 
@@ -147,8 +152,10 @@ function defaultDate() {
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
+  clearErrors()
   const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!valid || submitting.value) return
 
   const payload = {
     category: form.category,
@@ -159,17 +166,15 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    if (props.expense?.expenseId) {
-      await expenseApi.update(props.expense.expenseId, payload)
-      ElMessage.success('消费记录已更新')
-    } else {
-      await expenseApi.create(props.trip.tripId, payload)
-      ElMessage.success('消费记录已添加')
-    }
-    emit('saved')
+    const created = !props.expense?.expenseId
+    const saved = props.expense?.expenseId
+      ? await expenseApi.update(props.expense.expenseId, payload)
+      : await expenseApi.create(props.trip.tripId, payload)
+    ElMessage.success(created ? '消费记录已添加，可在详情查看' : '消费记录已更新')
+    emit('saved', saved, created)
     emit('update:modelValue', false)
-  } catch {
-    // 422/400 由拦截器提示
+  } catch (error) {
+    showError(error)
   } finally {
     submitting.value = false
   }
@@ -178,16 +183,16 @@ async function handleSubmit() {
 
 <style scoped>
 .unit {
-  margin-left: 8px;
+  margin-left:8px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
+  font-size: var(--tp-font-body);
 }
 
 .form-tip {
-  font-size: 12px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
   line-height: 1.6;
-  margin-top: 4px;
+  margin-top:4px;
 }
 
 .cat-dot {
@@ -195,6 +200,6 @@ async function handleSubmit() {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-right: 6px;
+  margin-right:4px;
 }
 </style>

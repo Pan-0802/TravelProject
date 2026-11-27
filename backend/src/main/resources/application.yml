@@ -4,7 +4,7 @@ spring:
   application:
     name: travel-backend
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/travel_planner_course?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/travel_planner_course_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     hikari:
@@ -34,3 +34,5 @@ app:
     ai-base-url: ${AI_BASE_URL:https://api.deepseek.com}
     ai-model: ${AI_MODEL:deepseek-flash}
     timeout-seconds: ${EXTERNAL_TIMEOUT_SECONDS:60}
+    ai-max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:16384}
+    amap-interval-millis: ${AMAP_INTERVAL_MILLIS:650}

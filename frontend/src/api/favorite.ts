@@ -6,7 +6,7 @@ export const favoriteApi = {
   list(params: PageQuery & { keyword?: string; city?: string }) {
     return http.get<PageResult<FavoriteItem>>('/favorites', {
       page: params.page ?? 1,
-      size: params.size ?? 10,
+      size: params.size ?? 20,
       keyword: params.keyword || undefined,
       city: params.city || undefined
     })

@@ -7,6 +7,7 @@ import type { ApiResponse } from '@/types/api'
 export interface ApiError extends Error {
   code: number
   status?: number
+  fieldErrors?: Record<string, string>
 }
 
 export interface RequestOptions extends AxiosRequestConfig {
@@ -16,7 +17,7 @@ export interface RequestOptions extends AxiosRequestConfig {
 
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '/api',
-  timeout: 15000,
+  timeout: 3000,
   headers: { 'Content-Type': 'application/json; charset=UTF-8' }
 })
 
@@ -37,6 +38,7 @@ instance.interceptors.response.use(
       const error = new Error(message) as ApiError
       error.code = (body && body.code) || -1
       error.status = response.status
+      error.fieldErrors = (body.data as { fieldErrors?: Record<string, string> } | null)?.fieldErrors
       if (!(response.config as RequestOptions).silent) {
         ElMessage.error(message)
       }
@@ -48,9 +50,20 @@ instance.interceptors.response.use(
   (error) => {
     const config = (error.config || {}) as RequestOptions
     const status: number | undefined = error.response?.status
-    const body = error.response?.data as { code?: number; message?: string } | undefined
+    const body = error.response?.data as { code?: number; message?: string; data?: { fieldErrors?: Record<string, string> } } | undefined
 
-    let message = body?.message || error.message || '网络异常'
+    const statusMessages: Record<number,string> = {
+      400:'填写内容或请求格式不正确，请检查后重试',
+      403:'当前操作未获授权，请检查登录状态和前后端地址配置',
+      404:'记录不存在或已被删除，请刷新列表',
+      409:'数据已经变化，请刷新后确认再操作',
+      429:'请求较频繁，请稍后重试',
+      500:'服务暂时异常，请稍后重试',
+      502:'外部服务响应异常，请稍后重试',
+      503:'服务暂时不可用，请稍后重试',
+      504:'外部服务响应超时，请稍后重试'
+    }
+    let message = body?.message || statusMessages[status || 0] || '网络异常，请检查连接后重试'
 
     if (status === 401) {
       const isLogin = /\/auth\/login$/.test(config.url || '')
@@ -59,7 +72,7 @@ instance.interceptors.response.use(
       if (!config.silent) ElMessage.error(message)
       if (!isLogin) redirectToLogin()
     } else if (error.code === 'ECONNABORTED' || /timeout/i.test(String(error.message))) {
-      message = '请求超时，请稍后重试'
+      message = '超过 3 秒未收到响应，请检查网络后重试；写入操作请先刷新确认结果。'
       if (!config.silent) ElMessage.error(message)
     } else if (!error.response) {
       message = '无法连接后端服务，请确认后端已启动（默认 http://localhost:8080）'
@@ -71,6 +84,7 @@ instance.interceptors.response.use(
     const apiError = new Error(message) as ApiError
     apiError.code = body?.code ?? -1
     apiError.status = status
+    apiError.fieldErrors = body?.data?.fieldErrors
     return Promise.reject(apiError)
   }
 )

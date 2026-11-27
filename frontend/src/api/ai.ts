@@ -18,7 +18,7 @@ export const aiApi = {
   list(params: AiPlanQuery) {
     return http.get<PageResult<AiPlanListItem>>('/ai/plans', {
       page: params.page ?? 1,
-      size: params.size ?? 10,
+      size: params.size ?? 20,
       status: params.status || undefined
     })
   },
@@ -27,6 +27,6 @@ export const aiApi = {
   },
   /** 409 = 目标旅行已有行程，需前端确认覆盖后带 confirmOverwrite=true 重试 */
   save(aiPlanId: string, payload: AiSavePayload) {
-    return http.post<AiSaveResult>(`/ai/plans/${aiPlanId}/save`, payload, { silent: true, timeout: 30000 })
+    return http.post<AiSaveResult>(`/ai/plans/${aiPlanId}/save`, payload, { silent: true })
   }
 }

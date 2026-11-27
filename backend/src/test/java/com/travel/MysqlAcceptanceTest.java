@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @ActiveProfiles(value="mysql-acceptance", inheritProfiles=false)
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class MysqlAcceptanceTest extends BackendIntegrationTest {
-    private static String schema;
+    private static boolean created;
     private static String serverUrl;
     private static String databaseUrl;
 
@@ -33,11 +33,12 @@ class MysqlAcceptanceTest extends BackendIntegrationTest {
         // Server URL must have an empty database path; never repurpose the existing application schema.
         if(serverUrl==null || !serverUrl.matches("jdbc:mysql://[^/]+/(\\?.*)?"))
             throw new IllegalArgumentException("MYSQL_SERVER_URL 必须是未指定数据库的 MySQL JDBC 地址");
-        schema="travel_acceptance_"+UUID.randomUUID().toString().replace("-", "");
+        // Fixed test-only catalog: CREATE fails if it already exists; never reuse someone else's database.
         try(var connection=admin();var statement=connection.createStatement()) {
-            statement.execute("CREATE DATABASE `"+schema+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+            statement.execute("CREATE DATABASE `travel_acceptance_course` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+            created=true;
         }
-        databaseUrl=serverUrl.replaceFirst("/(\\?|$)","/"+schema+"$1");
+        databaseUrl=serverUrl.replaceFirst("/(\\?|$)","/travel_acceptance_course$1");
         try(var connection=DriverManager.getConnection(databaseUrl,username(),password())) {
             String ddl=Files.readString(Path.of("../ER图和Mysql/01_建库建表_MySQL8.sql"),StandardCharsets.UTF_8)
                 .replaceFirst("(?is)CREATE DATABASE IF NOT EXISTS.*?;", "")
@@ -53,11 +54,11 @@ class MysqlAcceptanceTest extends BackendIntegrationTest {
     private static String password() { return System.getenv("MYSQL_TEST_PASSWORD"); }
     private static Connection admin() throws SQLException { return DriverManager.getConnection(serverUrl,username(),password()); }
     @AfterAll static void cleanup() throws Exception {
-        if(schema!=null && schema.matches("travel_acceptance_[0-9a-f]{32}")) {
+        if(created) {
             try(var connection=admin();var statement=connection.createStatement()) {
-                statement.execute("DROP DATABASE `"+schema+"`");
+                statement.execute("DROP DATABASE `travel_acceptance_course`");
             }
-            schema=null;
+            created=false;
         }
     }
 

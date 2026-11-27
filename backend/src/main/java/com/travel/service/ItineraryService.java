@@ -64,16 +64,28 @@ public class ItineraryService {
         ordered.removeIf(i -> i.getItemId().equals(item.getItemId()));
         ordered.add(Math.min(position-1,ordered.size()),item); normalize(item.getDayId(),ordered);
     }
+    private void positionByTime(ItineraryItem item) {
+        List<ItineraryItem> ordered=new ArrayList<>(queries.items(item.getDayId()));
+        // Put a new/moved item after existing items with the same start time.
+        ordered.removeIf(i -> i.getItemId().equals(item.getItemId()));
+        ordered.add(item);
+        ordered.sort(Comparator.comparing(ItineraryItem::getStartTime,Comparator.nullsLast(Comparator.naturalOrder())));
+        normalize(item.getDayId(),ordered);
+    }
     @Transactional public ItineraryItem create(Long tripId,LocalDate date,ItemWrite dto) {
         Trip trip=trips.owned(tripId,true); WriteSupport.inRange(date,trip.getStartDate(),trip.getEndDate()); check(dto);
         TripDay day=ensureDay(tripId,date); ItineraryItem item=new ItineraryItem(); BeanUtils.copyProperties(dto,item);
-        item.setDayId(day.getDayId()); item.setSourceType("MANUAL"); items.insert(item); position(item,dto.getSortOrder());
+        item.setDayId(day.getDayId()); item.setSourceType("MANUAL"); items.insert(item);
+        if(item.getStartTime()!=null) positionByTime(item); else position(item,dto.getSortOrder());
         return items.find(item.getItemId());
     }
     @Transactional public ItineraryItem patch(Long id,JsonNode patch) {
         ItineraryItem snapshot=owned(id); TripDay day=days.find(snapshot.getDayId()); trips.owned(day.getTripId(),true);
         ItineraryItem item=owned(id); ItemWrite dto=writes.patch(item,patch,ItemWrite.class); check(dto);
-        BeanUtils.copyProperties(dto,item); items.update(item); position(item,dto.getSortOrder()); return items.find(id);
+        boolean timeChanged=!Objects.equals(item.getStartTime(),dto.getStartTime());
+        BeanUtils.copyProperties(dto,item); items.update(item);
+        if(timeChanged) positionByTime(item); else position(item,dto.getSortOrder());
+        return items.find(id);
     }
     @Transactional public Map<String,Boolean> delete(Long id) {
         ItineraryItem item=owned(id); trips.owned(days.find(item.getDayId()).getTripId(),true); owned(id);

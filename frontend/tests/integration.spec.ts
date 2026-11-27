@@ -7,6 +7,7 @@ let token = ''
 let tripId = ''
 let planId = ''
 const requests: string[] = []
+test.use({actionTimeout:15000})
 
 async function api(request: APIRequestContext, method: string, path: string, body?: unknown) {
   const result = await request.fetch(`/api${path}`, { method, data: body, headers: token ? { Authorization: `Bearer ${token}` } : {} })
@@ -45,7 +46,8 @@ test.describe.serial('真实前后端联调', () => {
     await page.getByRole('button', { name: '新建旅行', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: /^(新建旅行|添加行程.*|记录消费)$/ })
     await dialog.getByPlaceholder('例如：重庆三日游').fill('页面联调验收旅行')
-    await dialog.getByPlaceholder('例如：重庆', { exact: true }).fill('重庆')
+    await dialog.locator('.el-select').first().click()
+    await page.getByRole('option',{name:'重庆市',exact:true}).click()
     await dialog.getByPlaceholder('开始日期').fill('2026-12-01')
     await dialog.getByPlaceholder('结束日期').fill('2026-12-01')
     await dialog.getByPlaceholder('结束日期').press('Tab')
@@ -54,7 +56,6 @@ test.describe.serial('真实前后端联调', () => {
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
     tripId = (await (await created).json()).data.tripId
     await expect(dialog).not.toBeVisible()
-    await page.getByRole('button', { name: '详情', exact: true }).first().click()
     await expect(page).toHaveURL(new RegExp(`/trips/${tripId}$`))
     for (const name of ['验收活动甲', '验收活动乙']) {
       await page.getByRole('button', { name: '添加行程', exact: true }).first().click()
@@ -71,6 +72,9 @@ test.describe.serial('真实前后端联调', () => {
     await dialog.getByPlaceholder('例如：午餐、地铁充值').fill('页面联调模拟消费')
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect(dialog).not.toBeVisible()
+    const expenseDetail=page.getByRole('dialog',{name:'消费详情',exact:true})
+    await expect(expenseDetail).toContainText('页面联调模拟消费')
+    await expenseDetail.getByRole('button',{name:'关闭',exact:true}).click()
     await expect(page.getByText('页面联调模拟消费', { exact: true })).toBeVisible()
     await page.getByRole('tab', { name: '预算统计' }).click()
     await expect(page.locator('.budget-panel')).toContainText('¥65.00')
@@ -83,22 +87,26 @@ test.describe.serial('真实前后端联调', () => {
   })
 
   test('自建景点、收藏与高德实时搜索', async ({ page }) => {
+    const attractionName = username + '_独立景点'
     await login(page)
     await page.goto('/attractions')
     await page.getByRole('button', { name: '新增自建景点', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '新增自建景点', exact: true })
-    await dialog.getByPlaceholder('例如：李子坝观景平台').fill('页面验收独立景点')
-    await dialog.getByPlaceholder('例如：重庆', { exact: true }).fill('重庆')
+    await dialog.getByPlaceholder('例如：李子坝观景平台').fill(attractionName)
+    await dialog.getByPlaceholder('先选省，再选市').click()
+    await page.locator('.el-cascader-panel:visible').getByText('重庆市',{exact:true}).click()
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect(dialog).not.toBeVisible()
-    const card = page.locator('.attr-card').filter({ hasText: '页面验收独立景点' })
-    await card.getByRole('button', { name: '收藏', exact: true }).click()
-    await expect(card.getByRole('button', { name: '取消收藏', exact: true })).toBeVisible()
+    const detail=page.getByRole('dialog',{name:'景点详情',exact:true})
+    await detail.getByRole('button',{name:'收藏',exact:true}).click()
+    await expect(detail.getByRole('button',{name:'取消收藏',exact:true})).toBeVisible()
+    await detail.getByRole('button',{name:'关闭',exact:true}).click()
     await page.goto('/favorites')
-    await expect(page.getByText('页面验收独立景点', { exact: true })).toBeVisible()
+    await expect(page.getByText(attractionName, { exact: true })).toBeVisible()
     await page.goto('/attractions')
     await page.getByPlaceholder('关键词，如：博物馆').fill('公园')
-    await page.getByPlaceholder('城市，如：重庆市').fill('重庆市')
+    await page.getByPlaceholder('选择省市').click()
+    await page.locator('.el-cascader-panel:visible').getByText('重庆市',{exact:true}).click()
     const response = page.waitForResponse(r => r.url().includes('/api/pois/search'))
     await page.getByRole('button', { name: '搜索', exact: true }).click()
     const body = await (await response).json()
@@ -108,22 +116,12 @@ test.describe.serial('真实前后端联调', () => {
   })
 
   test('真实AI生成、编辑、覆盖确认、保存与费用隔离', async ({ page, request }) => {
+    test.skip(process.env.RUN_LIVE_AI!=='true','设置 RUN_LIVE_AI=true 后才调用付费模型')
     await login(page)
-    await page.goto(`/ai?tripId=${tripId}`)
-    // 对话式流程：自动选中该旅行 → 交通方式 → 预算 → 偏好 → 附加要求 → 生成
-    await page.locator('.chat-chips .el-check-tag', { hasText: '公共交通' }).first().click()
-    await page.locator('.chat-chips .el-check-tag').first().click()
-    await page.getByRole('button', { name: '确定' }).click()
-    await page.getByPlaceholder(/还有什么要求/).fill('仅安排2个活动，用于课程联调验收。')
-    await page.getByRole('button', { name: '确定' }).click()
-    const generated = page.waitForResponse(r => r.url().endsWith('/api/ai/plans') && r.request().method() === 'POST', { timeout: 95000 })
-    await page.getByRole('button', { name: '开始生成方案' }).click()
-    const body = await (await generated).json()
-    expect(body.code, body.message).toBe(0)
-    planId = body.data.aiPlanId
-    await expect(page.locator('.plan-table')).toBeVisible()
-    await page.getByRole('button', { name: '编辑并保存行程' }).click()
-    await expect(page).toHaveURL(new RegExp(`/ai/result/${planId}$`))
+    const target=await api(request,'GET',`/trips/${tripId}`)
+    const generated=await api(request,'POST','/ai/plans',{tripId,destination:target.destination,startDate:target.startDate,endDate:target.endDate,travelDays:1,totalBudget:1500,transportation:'公共交通',requirements:'仅安排2个具体景点活动，用于旧接口兼容验收。'})
+    planId=generated.aiPlanId
+    await page.goto(`/ai/result/${planId}`)
     await expect(page.getByPlaceholder('活动名称（必填）').first()).toBeVisible()
     await page.getByPlaceholder('活动名称（必填）').first().fill('AI验收编辑后的活动')
     await page.getByRole('button', { name: '确认保存到旅行', exact: true }).first().click()
