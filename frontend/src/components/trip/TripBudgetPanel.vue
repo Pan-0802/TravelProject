@@ -50,10 +50,10 @@
             <el-table-column label="类别" width="100">
               <template #default="{ row }">{{ categoryLabel(row.category) }}</template>
             </el-table-column>
-            <el-table-column label="金额" width="120">
+            <el-table-column label="金额" width="120" align="right">
               <template #default="{ row }">{{ money(row.amount) }}</template>
             </el-table-column>
-            <el-table-column label="占比">
+            <el-table-column label="占比" align="right">
               <template #default="{ row }">
                 <el-progress
                   :percentage="percentOf(row.amount)"
