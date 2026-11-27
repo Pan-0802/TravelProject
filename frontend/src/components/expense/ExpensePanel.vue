@@ -195,6 +195,6 @@ onMounted(loadExpenses)
 
 .cat-tag {
   border-style: solid;
-  color:var(--tp-primary);
+  color: #33415c;
 }
 </style>
