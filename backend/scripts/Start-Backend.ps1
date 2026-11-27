@@ -1,4 +1,4 @@
-param([string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
+﻿param([string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Read-LocalEnvironment.ps1') -EnvironmentFile $EnvironmentFile
 if(-not $env:JWT_SECRET -or $env:JWT_SECRET -eq 'replace-with-at-least-32-random-bytes'){

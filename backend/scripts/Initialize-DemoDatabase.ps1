@@ -1,11 +1,12 @@
-param([switch]$RebuildDemo,[string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
+﻿param([switch]$RebuildDemo,[string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Read-LocalEnvironment.ps1') -EnvironmentFile $EnvironmentFile
 $backendPath=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $projectPath=(Resolve-Path (Join-Path $backendPath '..')).Path
-foreach($name in @('DB_URL','DB_USERNAME','DB_PASSWORD')) {
+foreach($name in @('DB_URL','DB_USERNAME')) {
     if($null -eq [Environment]::GetEnvironmentVariable($name,'Process')) { throw "请先在当前终端设置 $name，值无需写入源码。" }
 }
+if($env:DB_PASSWORD -eq 'replace-me'){throw '请将模板中的 DB_PASSWORD 替换为自己数据库的密码。'}
 Push-Location $backendPath
 try {
     & mvn '-DskipTests' package

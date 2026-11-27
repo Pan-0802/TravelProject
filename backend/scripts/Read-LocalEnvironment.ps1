@@ -1,4 +1,4 @@
-param([string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
+﻿param([string]$EnvironmentFile=(Join-Path $PSScriptRoot '../.env.local'))
 $ErrorActionPreference='Stop'
 if(Test-Path -LiteralPath $EnvironmentFile){
     foreach($line in Get-Content -LiteralPath $EnvironmentFile -Encoding UTF8){

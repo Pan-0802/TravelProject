@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$UseIdeaConfiguration,
     [string]$ServerUrl,
     [string]$Username,

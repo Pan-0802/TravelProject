@@ -23,6 +23,13 @@ public final class DatabaseInitializer {
                 while(databases.next())if("travel_planner_course_demo".equals(databases.getString(1)))exists=true;
             }
             if(exists&&!rebuild)throw new IllegalStateException("专用演示库已存在。保留数据请直接启动；确需重建时使用 -RebuildDemo 参数。");
+            if(!exists) {
+                // Atomic ownership: if another process creates this catalog meanwhile, CREATE
+                // fails before the script can run any DROP statements against that catalog.
+                try(var statement=connection.createStatement()) {
+                    statement.execute("CREATE DATABASE `travel_planner_course_demo` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+                }
+            }
             ScriptUtils.executeSqlScript(connection,new EncodedResource(new FileSystemResource(schema),StandardCharsets.UTF_8));
             connection.setCatalog("travel_planner_course_demo");
             try(var statement=connection.prepareStatement("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=?")) {

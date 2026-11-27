@@ -1,4 +1,4 @@
-param([switch]$UseIdeaConfiguration,[string]$JavaHome=$env:JAVA_HOME)
+﻿param([switch]$UseIdeaConfiguration,[string]$JavaHome=$env:JAVA_HOME)
 $ErrorActionPreference='Stop'
 $backendRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $saved=@{}
