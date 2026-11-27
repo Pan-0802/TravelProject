@@ -18,7 +18,11 @@ Vue 3 + Spring Boot + MySQL 的个人旅行管理系统，支持旅行、每日�
 | Node.js | `^20.19.0` 或 `>=22.12.0`；可按 `frontend/.nvmrc` 使用 Node 24 |
 | Git / 浏览器 | Git、Chrome 或 Edge；浏览器自动化测试使用 Edge |
 
-安装后重新打开终端，检查 `java -version`、`mvn -version`、`node -v`、`npm -v` 和 `git --version`。首次下载 Maven / npm 依赖需要联网。
+安装后重新打开终端，检查 `java -version`、`mvn -version`、`node -v`、`npm -v` 和 `git --version`。首次下载 Maven / npm 依赖需要联网。也可以用 `where.exe java`、`where.exe mvn`、`where.exe node` 确认命令实际指向哪个目录：装了 Maven 但没加进 `PATH` 时，`mvn` 仍然是“找不到命令”。
+
+**Windows 上没有 JDK / Maven 时**：JDK 从 [Adoptium](https://adoptium.net/temurin/releases/) 下载 Temurin 21 的 zip，解压到纯英文路径（例如 `D:\tools\jdk-21`），把其中的 `bin` 加入 `PATH`，并设置 `JAVA_HOME` 指向该解压目录；Maven 解压后同样把 `bin` 加入 `PATH`。JDK、Maven 与 MySQL 的安装路径都避免中文和空格。
+
+**PowerShell 里的 npm**：Windows PowerShell 的默认执行策略会禁止运行 `npm.ps1`，直接输入 `npm ci` 会报“无法加载文件 …\npm.ps1，因为在此系统上禁止运行脚本”。把命令里的 `npm` 换成 `npm.cmd` 即可，或先执行一次 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 再重新打开终端。
 
 ## 目录
 
@@ -107,6 +111,8 @@ powershell -ExecutionPolicy Bypass -File backend/scripts/Initialize-DemoDatabase
 
 初始化中断时先查看错误，不要把重建当成普通启动步骤。确实要丢弃专用演示库数据时才使用 `-RebuildDemo`；它会删除该库的 10 张应用表后重建。
 
+库已存在时脚本会以 `专用演示库已存在。保留数据请直接启动；确需重建时使用 -RebuildDemo 参数。` 拒绝执行，这是预期的保护，直接进入第 4 步启动后端即可。
+
 ### 4. 启动后端
 
 在根目录执行，并保留这个终端：
@@ -132,6 +138,8 @@ npm ci
 npm run dev
 ```
 
+PowerShell 提示 `npm.ps1` 被禁止运行时，把这两条换成 `npm.cmd ci` 和 `npm.cmd run dev`，原因见前文“环境要求”。
+
 打开 `http://localhost:5173`。空表安装先注册自己的账号再登录；导入完整备份后使用备份中已有的系统账号和原密码登录。`npm ci` 用于首次安装或锁文件变化后；普通代码修改不必反复安装。
 
 默认 `/api` 和 `/health` 通过 Vite 代理到本机 `8080` 后端。需要改后端地址时，复制 `frontend/.env.example` 为 `frontend/.env.development.local`，设置并重启前端：
@@ -153,8 +161,10 @@ VITE_PROXY_TARGET=http://127.0.0.1:8080
 MySQL 是数据库服务，Navicat 是连接和管理数据库的客户端，两者都需要准备好。
 
 1. 安装并启动 MySQL 8.0.16+，记住安装时设置的数据库用户名、密码和端口。
-2. Windows 可按 `Win + R`，输入 `services.msc`，找到自己安装的 MySQL 服务并启动；服务名可能是 `MySQL80`，以本机安装名称为准。
+2. Windows 可按 `Win + R`，输入 `services.msc`，找到自己安装的 MySQL 服务并启动；服务名可能是 `MySQL80`，以本机安装名称为准。启动服务需要管理员授权，会弹出 UAC 确认；普通权限的终端里执行 `Start-Service MySQL80` 通常会被拒绝。
 3. 有多个 MySQL 实例时，确认这次连接的是 8.0 实例对应的端口；例如旧实例占 `3306`、另一个实例占 `3307`。
+
+MySQL 的安装目录和数据目录保持纯英文路径。中文路径下曾出现 `mysqld` 启动后立即退出、错误日志里也没有任何提示的情况；服务起不来时先把它换到纯英文路径再排查。
 
 | 默认端口 | 用途 | 填在哪里 |
 | --- | --- | --- |
@@ -363,6 +373,8 @@ powershell -ExecutionPolicy Bypass -File backend/scripts/Export-Database.ps1 -Us
 | 中文数据乱码 | 核对库字符集为 utf8mb4、运行 SQL 文件时选 UTF-8；从原备份在新空库重新导入，不只改页面编码 |
 | `/health/ready` 是 UP，但看不到原旅行 | 检查库名和实际登录的应用账号；新注册账号的数据与旧账号隔离 |
 | 多轮聊天提示数据库未升级 | 核对两张聊天表；只有 8 表旧库需要 `upgrade-chat.sql`，完整备份或新建 10 表不需要 |
+| MySQL 服务启动后立即停止，错误日志没有内容 | 检查安装目录和数据目录是否含中文或空格；换到纯英文路径后重新初始化 |
+| 重复运行初始化脚本报 `专用演示库已存在` | 预期拒绝；已有库直接启动后端，确需重建才加 `-RebuildDemo` |
 
 SQL 执行出现错误时先查看第一条失败信息，不选择忽略错误继续执行。应用程序一般优先读取启动时的环境变量；排查时修改实际使用的 `.env.local` 或 IDEA 运行配置，而不只改 `application.yml` 的默认值。
 
@@ -525,6 +537,10 @@ npm --prefix frontend run test:e2e -- boundaries.spec.ts conversation.spec.ts co
 
 真实 MySQL 验收从 `backend/` 运行 `scripts/Test-MysqlAcceptance.ps1`，使用固定隔离测试库，结束后只清理本次创建的测试库。真实 AI 测试需要显式启用 `RUN_LIVE_AI=true` 或验收脚本的 `-RunLiveAi`，会创建测试数据并可能产生费用。
 
+上面的 `npm` 命令在 Windows PowerShell 里若因执行策略无法运行，把 `npm` 换成 `npm.cmd`。
+
+`npm run build` 会先跑 `vue-tsc` 全量类型检查再打包；较慢的 Windows 机器上类型检查可能持续数分钟且没有中间输出，属正常现象。想确认是否卡住，可单独执行 `npm run type-check`。
+
 浏览器截图和运行报告写入已忽略的 `test-results/` / `playwright-report/`，不会重新生成课程提交材料目录。
 
 前端 `dist/` 和后端 `target/` 是构建产物，不提交 Git。公开部署时，为前端配置静态站点、SPA 路由回退及 `/api` 反向代理；后端用环境变量启动 JAR，配置自己的数据库和 HTTPS。Vite 的 `dev` / `preview` 用于本机开发和预览。
@@ -552,7 +568,9 @@ git push origin main
 
 | 现象 | 处理 |
 | --- | --- |
-| `mvn` / `java` 找不到 | 配置 Maven 的 PATH、JDK 的 `JAVA_HOME`，重新打开终端 |
+| `mvn` / `java` 找不到 | 配置 Maven 的 PATH、JDK 的 `JAVA_HOME`，重新打开终端；用 `where.exe mvn` 确认指向 |
+| `npm` 报“无法加载文件 …npm.ps1，因为在此系统上禁止运行脚本” | 把 `npm` 换成 `npm.cmd`，或 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 后重开终端 |
+| MySQL 服务在 `services.msc` 里启动失败 | 启动服务需要管理员授权；以管理员身份打开 `services.msc` 再启动 |
 | 数据库连接失败 | 确认 MySQL 已启动、端口和密码正确，`DB_URL` 的库已初始化 |
 | 缺少 `JWT_SECRET` | 填写 `.env.local`，使用启动脚本；IDE 启动须单独配置环境变量 |
 | 新电脑不能用原账号登录 | 数据库没有随 Git 同步；新库请自行注册 |
