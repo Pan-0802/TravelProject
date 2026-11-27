@@ -1,106 +1,83 @@
 # Travel Planner · 个人旅行记录与智能规划系统
 
-《数据库原理与应用》课程设计，包含 Vue 前端、Spring Boot 后端、MySQL 脚本、接口文档和验收脚本。两位同学共用一个 GitHub 仓库，各自在本地开发，通过分支和 Pull Request 合并修改。
+Vue 3 + Spring Boot + MySQL 的个人旅行管理系统，支持旅行、每日活动、景点收藏、消费预算和 AI 多轮规划。
 
-## 1. 功能与技术栈
+仓库用于交付前后端源码、测试、配置模板和运行所需的数据库脚本。报告、答辩 PPT、录屏等课程材料不随源码交付。每个人在自己的电脑上安装依赖、建立数据库并配置密钥；GitHub 不会同步运行中的数据库或本机私密配置。
 
-- 用户注册、登录、个人资料和密码修改，JWT 身份认证。
-- 旅行计划、每日行程、活动排序、消费记录、预算和统计图表。
-- 本地景点与收藏、高德实时搜索；点击“录入景点”预填名称、城市和分类，核对并保存后可关联行程，搜索和取消不写库。
-- AI 行程生成、草稿编辑和确认保存；覆盖已有行程需要确认，AI 预计花费与实际消费分开记录。
-- 真实接口模式、独立 Mock 演示模式，以及后端和浏览器自动化测试。
+**收到同学的数据库 SQL 备份时，优先阅读 [数据库配置详解](#database-setup)**：连接自己的 MySQL、建空库、导入备份、填写后端配置，再启动系统。
 
-当前范围为 **8 张业务表＋2 张聊天表、普通用户系统**，不含管理员、照片和日记。实现以[最终需求说明书](个人旅行记录与智能规划系统_需求分析说明书_最终版.md)、[接口对接文档](对接/前后端_API_接口对接文档_V1.0.md)和[建表 SQL](ER图和Mysql/01_建库建表_MySQL8.sql)为准；较早的 `规划.md` 仅作背景参考。景点录入交互的后续调整已在接口文档中注明。
+**收到私下共享的高德 / AI Key 时，阅读 [API 配置详解](#api-setup)**：把共享的服务信息填进本机后端配置，重启后分别验证地点搜索和 AI 回复。
 
-| 环境 | 要求 |
+## 环境要求
+
+| 工具 | 要求 |
 | --- | --- |
-| 后端 | JDK 17 或 21、Maven 3.6.3+、Spring Boot 3.5、MyBatis |
-| 数据库 | MySQL 8.0.16+，新电脑演示库 `travel_planner_course_demo`；已有开发库可继续使用 |
-| 前端 | Vue 3、TypeScript、Element Plus、ECharts、Vite；Node.js `^20.19.0` 或 `>=22.12.0`，推荐按 `.nvmrc` 使用 Node 24 |
-| 开发工具 | Git、IDEA / VS Code、Navicat 或其他 MySQL 客户端 |
-| 浏览器 | 日常使用 Chrome / Edge；现有 Playwright 测试使用 Microsoft Edge |
+| Java | JDK 17 或 21，配置 `JAVA_HOME` |
+| Maven | 3.6.3+，命令行可运行 `mvn` |
+| MySQL | 8.0.16+，使用 utf8mb4 |
+| Node.js | `^20.19.0` 或 `>=22.12.0`；可按 `frontend/.nvmrc` 使用 Node 24 |
+| Git / 浏览器 | Git、Chrome 或 Edge；浏览器自动化测试使用 Edge |
 
-首次安装后打开新终端，用 `java -version`、`mvn -version`、`node -v`、`npm -v`、`git --version` 检查工具。命令行启动需要正确配置 `JAVA_HOME` 和 Maven 的 PATH。
+安装后重新打开终端，检查 `java -version`、`mvn -version`、`node -v`、`npm -v` 和 `git --version`。首次下载 Maven / npm 依赖需要联网。
 
-## 2. 项目目录
+## 目录
 
 ```text
 TravelProject/
-├─ backend/                 Spring Boot 后端
-│  ├─ src/main/             Java、MyBatis XML、application.yml
-│  ├─ src/test/             后端自动化测试
-│  ├─ scripts/              MySQL 验收脚本
-│  ├─ .env.example          后端环境变量清单，不含真实密码和 Key
-│  ├─ requests.http         IDEA HTTP Client 联调请求
-│  └─ README.md             后端详细说明
-├─ frontend/                Vue 前端（实际开发目录）
-│  ├─ src/                  页面、组件、接口封装、状态与 Mock
-│  ├─ tests/                Playwright 浏览器测试
-│  ├─ scripts/              联调验收脚本
-│  ├─ .env.example          前端公开配置模板
-│  ├─ package-lock.json     依赖锁定文件，需要提交
-│  └─ README.md             前端详细说明
-├─ ER图和Mysql/             ER 图、字段字典、初始化 SQL 与聊天增量升级
-├─ 对接/                    API 契约与分工文档
-├─ .gitignore               排除本机配置、密钥文件和构建产物
-└─ README.md                安装、启动、GitHub 上传与双人协作
+├─ backend/
+│  ├─ src/main/java/                     后端业务源码与初始化工具
+│  ├─ src/main/resources/
+│  │  ├─ application.yml                使用环境变量的公开配置
+│  │  ├─ mapper/                        MyBatis 参数化 SQL
+│  │  └─ db/mysql/
+│  │     ├─ schema.sql                  新安装：完整 10 张空表
+│  │     └─ upgrade-chat.sql            旧 8 表版本：新增两张聊天表
+│  ├─ src/test/                         后端自动化测试
+│  ├─ scripts/                          初始化、启动和验收入口
+│  ├─ .env.example                      本机配置模板
+│  └─ requests.http                     接口联调示例
+├─ frontend/                            Vue 页面、组件、类型和浏览器测试
+│  ├─ package-lock.json                 锁定依赖版本
+│  └─ .env.example                      前端公开配置模板
+├─ .gitignore                           排除密钥、本机配置和构建产物
+└─ README.md
 ```
 
-前端代码在 `frontend/`。
+## 新电脑首次运行
 
-## 3. 新电脑第一次运行
+以下命令使用 Windows PowerShell，除注明外均在项目根目录运行。macOS / Linux 可用 MySQL 客户端执行相同 SQL，并在终端设置环境变量后运行 Maven 和 npm。
 
-建议两人各自在自己的电脑上运行前后端和 MySQL。GitHub 同步代码和 SQL，**不会同步数据库中的账号、旅行数据，也不会同步本机环境变量**。
-
-### 3.1 一次初始化完整数据库
-
-新电脑第一次运行，在 Navicat 连接 MySQL 8.0.16+，打开根目录 **`schema.sql`** 并完整执行一次。一个文件包含10张表、主外键、唯一约束、检查约束、索引，以及分页、零预算、三种AI状态和多轮消息测试数据。
-
-目标库固定为 **`travel_planner_course_demo`**。脚本会重建这个专用演示库中的10张表；不要在此库保存需要保留的个人数据，也不要对它反复运行初始化。原开发库 `travel_planner_course` 不受此脚本影响。
-
-也可配置下一节的 `backend/.env.local` 后，在根目录执行：
+### 1. 克隆代码
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File backend/scripts/Initialize-DemoDatabase.ps1
+git clone https://github.com/Pan-0802/TravelProject.git
+cd TravelProject
 ```
 
-这个入口默认只允许新建；如果演示库已存在，会拒绝执行并保留数据。只有确定要丢弃演示库数据时，才使用 `-RebuildDemo`。旧开发库升级仅执行 `ER图和Mysql/04_AI多轮会话_增量升级.sql`，不要在旧库重导种子数据。
+私有仓库需要先取得仓库访问权限。已克隆过的电脑更新代码即可，无需重新克隆或重建数据库。
 
-演示账号：`demo_zhang`、`demo_li`、`demo_wang`、`demo_chen`，统一密码 **`Test@123456`**。张同学账号有超过20条旅行，可验证分页；会话“重庆 · 3天旅行”带完整可保存草稿；“失败重试示例”用于验证失败反馈。测试费用是模拟数据。
+### 2. 填写本机配置
 
-未配置外部Key也能演示登录、旅行、景点、收藏、消费、预算、统计以及现有AI草稿的编辑与确认保存；实时高德查询和生成新AI回复需要本人配置对应Key。
-
-### 3.2 配置并启动后端
-
-最少配置方式：复制 `backend/.env.example` 为 **`backend/.env.local`**，填写自己的数据库端口、用户名、密码和固定随机JWT密钥。这个本地文件已被Git忽略，API Key只填在此处或IDE运行配置，不填到前端。
-
-在根目录启动：
+首次复制模板；已有 `.env.local` 时保留自己的配置：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File backend/scripts/Start-Backend.ps1
+Copy-Item backend/.env.example backend/.env.local
 ```
 
-启动脚本会读取本地文件。**直接使用IDEA运行或 `mvn spring-boot:run` 时，Spring Boot本身不会自动加载 `.env.local`**，此时仍须在IDE或当前终端设置环境变量。以下保留IDEA配置方式。
+编辑 `backend/.env.local`，至少填写下面四项：
 
+```dotenv
+DB_URL=jdbc:mysql://localhost:3306/travel_planner_course_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+DB_USERNAME=root
+DB_PASSWORD=填写自己的MySQL密码
+JWT_SECRET=replace-with-at-least-32-random-bytes
+```
 
-在 IDEA 打开 `backend/pom.xml`，导入 Maven 项目，选择 JDK 17 或 21。在 `com.travel.TravelApplication` 的运行配置 **Environment variables** 中设置：
+`DB_URL` 的端口按本机 MySQL 修改，例如 `3306` 或 `3307`。MySQL 必须先启动。自动初始化入口只创建 `travel_planner_course_demo`；使用自定义数据库名时按下一节的手动方式初始化，并同步修改 `DB_URL`。
 
-| 变量 | 必填 | 填写说明 |
-| --- | --- | --- |
-| `DB_URL` | 建议设置 | `jdbc:mysql://127.0.0.1:3307/travel_planner_course_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai`；端口按自己的 MySQL 修改 |
-| `DB_USERNAME` | 是 | 自己的数据库用户名，例如 `root` |
-| `DB_PASSWORD` | 是 | 自己的数据库密码 |
-| `JWT_SECRET` | 是 | 至少 32 字节的随机密钥，生成方式见下方 |
-| `AMAP_KEY` | 高德功能需要 | 高德 Web 服务 Key，仅配置在后端 |
-| `AI_API_KEY` | AI 功能需要 | 模型服务的 API Key，仅配置在后端 |
-| `AI_BASE_URL` | 可选 | 默认 `https://api.deepseek.com`，按实际服务商配置 |
-| `AI_MODEL` | AI 功能需要 | 使用自己接口模型列表返回的模型 ID；本项目已验证 `deepseek-flash` |
-| `SERVER_PORT` | 可选 | 默认 `8080` |
-| `EXTERNAL_TIMEOUT_SECONDS` | 可选 | 默认 `60` 秒 |
+`JWT_SECRET` 示例是占位符，必须用下面生成的随机值替换，否则启动脚本会拒绝启动。
 
-数据库默认端口为 `3306`，当前原开发电脑的 MySQL 8 使用 `3307`，同学的端口不一定相同。IDEA 中设置的 `DB_URL` 会覆盖 `application.yml` 默认值。
-
-在 PowerShell 执行一次以下命令生成 JWT 密钥，将输出填入 IDEA 的 `JWT_SECRET`，以后启动保持该值：
+在 PowerShell 生成一次至少 32 字节的 JWT 密钥，将输出填到 `JWT_SECRET`，后续启动保持这个值：
 
 ```powershell
 $jwtBytes = New-Object byte[] 32
@@ -108,24 +85,46 @@ $jwtBytes = New-Object byte[] 32
 [Convert]::ToBase64String($jwtBytes)
 ```
 
-`backend/.env.example` 是公开模板；本地 `.env.local` 由新增的启动脚本读取，或在IDEA中使用环境变量。真实值不要填回已提交的模板或源码。
+`.env.local` 已被 Git 忽略。真实密码和 Key 不填入 `.env.example`、`application.yml` 或前端 `VITE_` 变量。
 
-配置好后点击运行 `TravelApplication`。也可以在已设置环境变量的 PowerShell 窗口中，进入 `backend/` 执行：
+### 3. 准备数据库（两种方式选一种）
+
+**已有同学发来的完整 SQL 备份**：按下方 [数据库配置详解](#database-setup) 建空库并导入备份，配置数据库连接后直接进入第 4 步。备份已包含结构与数据，跳过本节的空表初始化。
+
+**希望建立全新的空系统**：首次运行下面的自动建库命令，或者按下方详解在 Navicat 中手工建库并运行 `schema.sql`：
 
 ```powershell
-mvn spring-boot:run
+powershell -ExecutionPolicy Bypass -File backend/scripts/Initialize-DemoDatabase.ps1
 ```
 
-后端启动后访问：
+脚本读取 `.env.local`，构建后端，并使用打包在后端中的 `db/mysql/schema.sql` 创建专用数据库和完整 10 张表。需要该 MySQL 账号具有建库、建表权限；数据库已存在时默认拒绝执行，避免重复初始化。
 
-- `http://localhost:8080/health`：检查进程存活。
-- `http://localhost:8080/health/ready`：检查数据库就绪；正常返回 `code: 0`、`database: UP`。
+也可以在 Navicat / MySQL 客户端中创建一个 **utf8mb4 空库**，选中该库，完整执行 [backend/src/main/resources/db/mysql/schema.sql](backend/src/main/resources/db/mysql/schema.sql)。此文件不选择数据库、不删除表，也不插入用户或业务数据。自定义库名时使用这种方式。
 
-未配置高德或 AI Key 时可以使用基础功能，对应外部服务功能会明确提示未配置。详细说明见 [backend/README.md](backend/README.md)。
+初始化后是空系统，**没有内置真实模式登录账号**。在页面注册自己的用户后登录。`demo_zhang / Test@123456` 仅适用于前端 Mock 演示模式。
 
-### 3.3 安装并启动前端
+如果使用已有完整数据库，跳过初始化。只有原来的 8 表旧版本才需要在自己的目标库执行 [upgrade-chat.sql](backend/src/main/resources/db/mysql/upgrade-chat.sql)，它只创建两张聊天表，不清空旅行和消费。已有 10 张表时不需要重复升级。
 
-另开终端，在项目根目录执行：
+初始化中断时先查看错误，不要把重建当成普通启动步骤。确实要丢弃专用演示库数据时才使用 `-RebuildDemo`；它会删除该库的 10 张应用表后重建。
+
+### 4. 启动后端
+
+在根目录执行，并保留这个终端：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backend/scripts/Start-Backend.ps1
+```
+
+这个脚本会读取 `backend/.env.local`。直接在 IDEA 运行 `com.travel.TravelApplication` 或执行 `mvn spring-boot:run` 时，Spring Boot 不会自动读取 `.env.local`，需要在 IDE 或当前终端设置对应环境变量。
+
+检查：
+
+- `http://localhost:8080/health`：进程是否存活。
+- `http://localhost:8080/health/ready`：数据库是否就绪，成功返回 `code: 0` 和 `data.database: UP`。
+
+### 5. 启动前端
+
+另开一个终端，在项目根目录运行：
 
 ```powershell
 cd frontend
@@ -133,9 +132,9 @@ npm ci
 npm run dev
 ```
 
-打开 `http://localhost:5173`。`npm ci` 按锁定文件安装依赖，首次克隆或依赖发生变化后运行；普通代码修改不必每次重新安装。也可以双击 `frontend/启动网页.bat` 启动真实接口模式。
+打开 `http://localhost:5173`。空表安装先注册自己的账号再登录；导入完整备份后使用备份中已有的系统账号和原密码登录。`npm ci` 用于首次安装或锁文件变化后；普通代码修改不必反复安装。
 
-默认前端通过 `/api` 代理访问本机 `8080` 后端。需要自定义时，将 `frontend/.env.example` 复制为 `frontend/.env.development.local` 后修改，修改后重启前端：
+默认 `/api` 和 `/health` 通过 Vite 代理到本机 `8080` 后端。需要改后端地址时，复制 `frontend/.env.example` 为 `frontend/.env.development.local`，设置并重启前端：
 
 ```dotenv
 VITE_API_BASE=/api
@@ -143,257 +142,423 @@ VITE_USE_MOCK=false
 VITE_PROXY_TARGET=http://127.0.0.1:8080
 ```
 
-`.env.development.local` 已忽略，不提交。**所有 `VITE_` 变量都应视为浏览器可见配置，禁止存放 AI、高德 Web 服务 Key、JWT 密钥或数据库密码。**
+<a id="database-setup"></a>
 
-仅演示页面时可运行 `npm run dev:mock`，无需后端。Mock 数据与真实 MySQL 数据分开，切换模式后退出旧登录再重新登录。详细说明见 [frontend/README.md](frontend/README.md)。
+## 数据库配置详解：Navicat、完整备份与后端连接
 
-### 3.4 两台电脑联调（可选）
+以下步骤在接收代码和备份的同学自己的电脑上操作。统一以本机 MySQL、端口 `3306`、库名 `travel_planner_course_demo` 为例；实际端口或库名不同，按本机情况替换。
 
-例如后端同学的局域网 IP 是 `192.168.1.20`，前端同学在自己的 `frontend/.env.development.local` 设置：
+### 1. 确认 MySQL 服务正在运行
+
+MySQL 是数据库服务，Navicat 是连接和管理数据库的客户端，两者都需要准备好。
+
+1. 安装并启动 MySQL 8.0.16+，记住安装时设置的数据库用户名、密码和端口。
+2. Windows 可按 `Win + R`，输入 `services.msc`，找到自己安装的 MySQL 服务并启动；服务名可能是 `MySQL80`，以本机安装名称为准。
+3. 有多个 MySQL 实例时，确认这次连接的是 8.0 实例对应的端口；例如旧实例占 `3306`、另一个实例占 `3307`。
+
+| 默认端口 | 用途 | 填在哪里 |
+| --- | --- | --- |
+| `3306`（或本机实际的 `3307`） | MySQL 数据库服务 | Navicat 连接端口、`DB_URL` |
+| `8080` | Spring Boot 后端 | 前端代理、后端就绪检查 |
+| `5173` | Vue 前端 | 浏览器打开的页面地址 |
+
+### 2. 在 Navicat 新建 MySQL 连接
+
+打开 Navicat，选择“连接 → MySQL”（部分版本为“新建连接 → MySQL”），填写：
+
+| 连接项目 | 示例 | 说明 |
+| --- | --- | --- |
+| 连接名 | `我的本地MySQL8` | 只是 Navicat 中的显示名称，可以用中文 |
+| 主机 | `127.0.0.1` | 连接自己电脑上的 MySQL，不填对方电脑的地址 |
+| 端口 | `3306` | 与自己 MySQL 实例的端口一致 |
+| 用户名 | `root` | 使用自己本机有权限的数据库账号 |
+| 密码 | 自己安装 MySQL 时设置的密码 | 不是系统网页登录密码，也不是对方电脑的 MySQL 密码 |
+
+点击“测试连接”，成功后保存并打开连接。连接失败时先检查服务、端口和密码，不要急着改项目代码。
+
+在这个连接下新建查询，运行：
+
+```sql
+SELECT VERSION() AS mysql_version;
+```
+
+确认服务器为 MySQL 8.0.16+。Navicat 的连接名即使叫“MySQL8”，也不能证明连到的服务器就是 8.0。项目使用的 `CHECK` 约束从 MySQL 8.0.16 起才得到实际执行，参见 [MySQL CHECK 约束说明](https://dev.mysql.com/doc/refman/8.0/en/create-table-check-constraints.html)。
+
+### 3. 建立一个新的空数据库
+
+在 Navicat 左侧 **右键刚打开的 MySQL 连接 → 新建数据库**：
+
+- 数据库名：`travel_planner_course_demo`。
+- 字符集：`utf8mb4`。
+- 排序规则：`utf8mb4_0900_ai_ci`。
+
+保存后刷新连接，双击打开这个数据库。如果同名库里已有数据，另取新名字并同步修改后面的 `DB_URL`，不要覆盖旧库。
+
+也可在 Navicat 查询窗口执行下面的建库语句；它和界面建库是同一个步骤，二选一即可：
+
+```sql
+CREATE DATABASE `travel_planner_course_demo`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+```
+
+数据库名与 Navicat 连接名不同：`DB_URL` 填的是 `travel_planner_course_demo`，而不是“我的本地MySQL8”。
+
+### 4. 选择导入完整备份，或只建立空表
+
+| 手里的文件 | 包含内容 | 适用情况 |
+| --- | --- | --- |
+| 同学私下发来的 `travel_planner_course-日期时间.sql` 完整备份 | 表结构、账号、旅行、景点、消费、聊天等现有数据 | 希望看到与发送方相同的数据 |
+| 仓库的 `backend/src/main/resources/db/mysql/schema.sql` | 完整 10 张空表，不插入账号和业务数据 | 从空白系统开始使用 |
+| 仓库的 `backend/src/main/resources/db/mysql/upgrade-chat.sql` | 仅增加两张聊天表 | 只用于已有的 8 表旧版本升级 |
+
+新电脑安装时，前两种方式选一种。新空库不单独运行聊天升级脚本。
+
+**方式 A：导入同学的完整备份（双方需要相同数据时使用）。**
+
+1. 通过私下文件传输取得完整 `.sql` 备份，保存到自己电脑上；完整备份不随 Git 仓库提供。
+2. 在 Navicat 左侧双击打开第 3 步的新空库，确认选中的是这个库。
+3. **右键这个数据库 → 运行 SQL 文件**，选择收到的备份，文件编码选择 **UTF-8**。
+4. 不启用“遇到错误继续 / Continue on error”，点击“开始”，检查结果中没有失败语句。
+5. 完成后刷新数据库下的“表”，继续第 5 步核对导入结果。
+
+Navicat 的运行 SQL 文件入口见 [官方导入说明](https://help.navicat.com/hc/en-us/articles/218303897-How-to-import-SQL-files-script-files-or-command-files-into-the-server)。本项目导出脚本生成的备份不固定目标库名，可在已选中的新空库中运行；如果拿到的是其他工具生成的备份，应先确认其中的 `USE` / 建库语句是否选择了正确的目标库。
+
+完整备份已经包含建表语句，导入后直接配置并启动后端。不要再运行空库初始化、再次导入同一份数据或执行 `-RebuildDemo`。
+
+**方式 B：只建立空表。**
+
+在第 3 步创建的空库上“运行 SQL 文件”，选择仓库里的 `backend/src/main/resources/db/mysql/schema.sql`，使用 UTF-8 执行，然后刷新表列表。这条路径的数据库没有内置系统账号，启动前端后自行注册。
+
+手工已经建好的空库采用上述方式即可。若使用前文的 `Initialize-DemoDatabase.ps1` 自动创建数据库，则省略 Navicat 手工建库步骤；自动脚本发现同名库已经存在时会拒绝执行。
+
+### 5. 核对数据库、10 张表和数据
+
+在 **刚导入的数据库** 下新建查询，运行：
+
+```sql
+SELECT DATABASE() AS current_database;
+SHOW TABLES;
+
+SELECT 'user' AS table_name, COUNT(*) AS row_count FROM `user`
+UNION ALL SELECT 'trip', COUNT(*) FROM `trip`
+UNION ALL SELECT 'attraction', COUNT(*) FROM `attraction`
+UNION ALL SELECT 'favorite', COUNT(*) FROM `favorite`
+UNION ALL SELECT 'trip_day', COUNT(*) FROM `trip_day`
+UNION ALL SELECT 'itinerary_item', COUNT(*) FROM `itinerary_item`
+UNION ALL SELECT 'expense', COUNT(*) FROM `expense`
+UNION ALL SELECT 'ai_plan_record', COUNT(*) FROM `ai_plan_record`
+UNION ALL SELECT 'ai_conversation', COUNT(*) FROM `ai_conversation`
+UNION ALL SELECT 'ai_chat_message', COUNT(*) FROM `ai_chat_message`;
+```
+
+确认 `current_database` 为自己刚创建的库，表列表有上述 10 张表。空表安装时记录数为 0 是正常的；完整备份应与发送方这份备份对应的记录数一致，不能用其他日期的备份数量作比较。
+
+完整备份导入后，如需查看已有的系统用户名，可执行：
+
+```sql
+SELECT user_id, username, nickname
+FROM `user`
+ORDER BY user_id;
+```
+
+这不是查看 MySQL 的 `root` 账户。应用用户的密码保存为哈希，不能直接从表中读出原密码，请向发送方确认原系统登录账号和密码。数据按应用用户隔离：注册新账号后看不到旧账号的旅行，不代表数据导入失败。
+
+### 6. 填写后端 `.env.local`
+
+回到项目根目录。首次复制模板；已经配置过时直接编辑现有文件，不覆盖自己的配置：
+
+```powershell
+Copy-Item backend/.env.example backend/.env.local
+```
+
+打开 `backend/.env.local`，按照 **自己 Navicat 中已经连接成功的参数** 修改：
 
 ```dotenv
-VITE_PROXY_TARGET=http://192.168.1.20:8080
+DB_URL=jdbc:mysql://127.0.0.1:3306/travel_planner_course_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+DB_USERNAME=root
+DB_PASSWORD=替换为自己本机MySQL的密码
+JWT_SECRET=replace-with-at-least-32-random-bytes
 ```
 
-两台电脑应处于可互通的网络，后端电脑允许前端电脑通过防火墙访问 8080，且后端保持启动。前端同学仍打开自己电脑的 `http://localhost:5173`，可先访问 `http://192.168.1.20:8080/health/ready` 验证后端连通性。
+| 配置位置 | 要与什么一致 |
+| --- | --- |
+| `DB_URL` 中的 `127.0.0.1` | Navicat 的主机 |
+| `DB_URL` 中的 `3306` | Navicat 的连接端口；本机为 `3307` 就改成 `3307` |
+| `DB_URL` 中 `/` 后、`?` 前的库名 | 刚才实际导入的数据库名称 |
+| `DB_USERNAME`、`DB_PASSWORD` | 自己 Navicat 连接成功所用的数据库账号、密码 |
+| `JWT_SECRET` | 按前文方法生成的固定随机密钥，必须替换占位符 |
 
-此方式使用后端同学的数据库和 API 配置；前端同学无需连接或开放 MySQL 端口。`localhost` 始终指当前访问它的那台电脑。
+例如，同学的 MySQL 在 `3307`、导入库名为 `travel_planner_course`，只需把该行改为：
 
-## 4. 首次上传 GitHub（仓库创建者操作一次）
+```dotenv
+DB_URL=jdbc:mysql://127.0.0.1:3307/travel_planner_course?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+```
 
-以下使用 PowerShell / IDEA Terminal。将示例中的用户名、邮箱和仓库地址替换为自己的信息；不要在命令中填写 API Key。
+文件保存为 UTF-8，确认名称确实是 `.env.local`，不是 `.env.local.txt`。每行格式为 `变量名=值`，不写 PowerShell 的 `$env:`，不加行尾分号或密码后的行内注释。JWT 填的是随机签名密钥，不是登录接口返回的 `accessToken`，普通重启保持同一密钥。
 
-### 4.1 创建远程空仓库
+数据库配置只保存在自己的本机文件中，已被 Git 忽略。AI / 高德 Key 和 JWT 密钥不随应用库备份自动设置，按后面的可选服务配置分别填写。
 
-1. 登录 GitHub，进入 [新建仓库页面](https://github.com/new)。
-2. Repository name 填 `TravelProject`，两人课程协作建议先选 **Private**。
-3. **不要勾选初始化 README、`.gitignore` 或 License**，本地已有项目文件。
-4. 点击 **Create repository**，复制 HTTPS 地址，类似 `https://github.com/YOUR_NAME/TravelProject.git`。
+### 7. 启动后端并检查连接
 
-步骤依据 [GitHub：上传已有本地项目](https://docs.github.com/en/migrations/importing-source-code/using-the-command-line-to-import-source-code/adding-locally-hosted-code-to-github)。
-
-### 4.2 在整个项目的根目录初始化
-
-当前原开发电脑的路径如下，其他电脑使用自己的路径：
+从项目根目录执行：
 
 ```powershell
-cd 'D:\Aaone\class\classProject\TravelProject'
-git init -b main
-git config user.name "YOUR_NAME"
-git config user.email "YOUR_GITHUB_EMAIL"
-git add .
-git status --short
-git diff --cached --stat
+powershell -ExecutionPolicy Bypass -File backend/scripts/Start-Backend.ps1
 ```
 
-`user.name` 是提交显示名称，`user.email` 建议使用自己 GitHub 设置中的提交邮箱或 noreply 邮箱，它们不是登录密码。上述配置只作用于本仓库。**整个项目只在根目录初始化一次，不在前后端目录分别新建仓库。**
-
-先核对暂存文件。应包含前后端源码、`package-lock.json`、SQL、README 和必要设计文档；不应包含：
-
-- `.idea/`、`*.iml`、真实 `.env` / `.env.*.local`、`http-client.private.env.json`。
-- `node_modules/`、`target/`、`dist/`、测试运行报告、日志。
-- 真实数据库密码、JWT 密钥、API Key 或 `requests.http` 中临时粘贴的登录 Token。
-
-可运行 `git diff --cached` 在本机检查提交内容，确认无误后继续：
+保留运行窗口，在浏览器打开 `http://localhost:8080/health/ready`，或者另开终端运行：
 
 ```powershell
-git commit -m "chore: initial TravelProject"
-git remote add origin https://github.com/YOUR_NAME/TravelProject.git
-git push -u origin main
+Invoke-RestMethod 'http://localhost:8080/health/ready' | ConvertTo-Json -Depth 5
 ```
 
-首次 HTTPS 操作如弹出 Git Credential Manager 登录窗口，选择浏览器登录并授权自己的 GitHub 账号。Git for Windows 包含此工具，参见 [GitHub：缓存 Git 凭据](https://docs.github.com/en/get-started/git-basics/caching-your-github-credentials-in-git)。不要把 GitHub 网页密码当作命令行 Token，也不要把访问令牌放进仓库 URL。
+正常结果如下，JSON 字段顺序可能不同：
 
-刷新仓库首页，应看到根目录 README、`backend/` 和 `frontend/`。源码上传成功不代表网站已部署，数据库和第三方服务仍在运行后端的电脑上。
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "status": "UP",
+    "database": "UP"
+  }
+}
+```
 
-### 4.3 邀请另一位同学
+这个检查验证数据库连接和用户表可以查询；完整 10 表仍以第 5 步核对为准。成功后按前文启动前端：导入完整备份时用原系统账号登录，空表安装时先注册。
 
-仓库页面 → **Settings → Collaborators（部分界面为 Collaborators & teams）→ Add people** → 输入同学的 GitHub 用户名 → 发送邀请。
+如果直接点 IDEA 的绿色运行按钮，应在 `TravelApplication` 的运行配置中设置相同的 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 和 `JWT_SECRET`。IDEA / 直接 Maven 启动不会自动读取 `.env.local`；Navicat 中修改连接也不会自动修改后端配置。改动连接配置后重启后端。
 
-同学接受邀请后，才能访问私有仓库并提交分支。两人使用各自账号，无需共享 GitHub 密码。参见 [GitHub：邀请仓库协作者](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/repository-access-and-collaboration/inviting-collaborators-to-a-personal-repository)。
+### 8. 发送方如何重新导出最新数据
 
-### 4.4 同学克隆并安装
-
-在希望存放项目的父目录执行：
+拥有现有数据的一方，在配置好 `.env.local` 后，从根目录执行（需要 MySQL 8.x 客户端）：
 
 ```powershell
-git clone https://github.com/YOUR_NAME/TravelProject.git
-cd TravelProject
-git config user.name "TEAMMATE_NAME"
-git config user.email "TEAMMATE_GITHUB_EMAIL"
+powershell -ExecutionPolicy Bypass -File backend/scripts/Export-Database.ps1
 ```
 
-再按第 3 节初始化自己的数据库、后端配置并安装前端依赖。接受邀请后仍无法访问时，检查 Git 登录的是否为被邀请账号。
+如果原电脑只在 IDEA 的 `TravelApplication` 中保存了数据库配置，使用：
 
-## 5. 两人日常修改与合并
+```powershell
+powershell -ExecutionPolicy Bypass -File backend/scripts/Export-Database.ps1 -UseIdeaConfiguration
+```
 
-GitHub 协作是“各自本地修改 → 提交分支 → 合并 → 对方拉取”，不会像在线文档一样实时同步。约定 `main` 保存可以运行的版本，每项任务从最新 `main` 创建新分支，提交 Pull Request 后由另一人检查。
+脚本只读源数据库，导出全部结构和数据，结果默认在 `backend/backups/数据库名-日期时间.sql`。该目录已被 Git 忽略；数据库连接密码不写入命令行或 SQL。若 MySQL 客户端安装在其他位置，可加 `-MysqlDumpPath '自己的MySQL8目录/bin/mysqldump.exe'`。
 
-| 负责人 | 主要目录 | 共同约定 |
+脚本用 `--result-file` 输出备份，避免 PowerShell 的 `>` 重定向把文件转换成不合适的编码，详见 [MySQL 备份说明](https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html)。
+
+将生成的 SQL 私下发给同学，按以上步骤导入新的空库。备份包含应用账号哈希和聊天内容，只与获准使用这些数据的人共享。双方导入后各有一份数据库，后续数据修改不会自动同步；需要新快照时重新导出。
+
+### 9. 常见数据库错误
+
+| 提示或现象 | 检查方法 |
+| --- | --- |
+| `Connection refused` / `Communications link failure` | 先用 Navicat 测试连接；检查 MySQL 服务、主机和实际端口 |
+| `Access denied for user` | 检查本机 MySQL 用户名、密码及访问权限；不要填系统网页登录密码 |
+| `Unknown database` | 核对 `DB_URL` 的库名与 Navicat 实际库名；连接显示名称不能当库名 |
+| `Table ... doesn't exist` | 确认查询和后端连接的是导入目标库，核对是否有完整 10 张表 |
+| `Unknown collation: utf8mb4_0900_ai_ci` | 运行 `SELECT VERSION()`，确认连到 MySQL 8.0 实例的正确端口，而不是旧实例 |
+| `Table ... already exists` / `Duplicate entry` | 确认是否把完整备份导入了非空库；保留已有数据，改用新的空库导入 |
+| 中文数据乱码 | 核对库字符集为 utf8mb4、运行 SQL 文件时选 UTF-8；从原备份在新空库重新导入，不只改页面编码 |
+| `/health/ready` 是 UP，但看不到原旅行 | 检查库名和实际登录的应用账号；新注册账号的数据与旧账号隔离 |
+| 多轮聊天提示数据库未升级 | 核对两张聊天表；只有 8 表旧库需要 `upgrade-chat.sql`，完整备份或新建 10 表不需要 |
+
+SQL 执行出现错误时先查看第一条失败信息，不选择忽略错误继续执行。应用程序一般优先读取启动时的环境变量；排查时修改实际使用的 `.env.local` 或 IDEA 运行配置，而不只改 `application.yml` 的默认值。
+
+<a id="api-setup"></a>
+
+## API 配置详解：私下共享的高德与 AI Key
+
+两个人可以各自在自己的电脑上运行项目，使用提供者授权共享的 API Key。无需在同一个地点或使用同一台电脑；每个人的后端通过自己的网络访问高德和模型服务。
+
+源码从 GitHub 获取、数据库备份私下导入、API 信息私下接收，这三件事分别完成。下面所有 Key 都是占位说明，真实值只填在接收者自己的后端本地配置中。
+
+### 1. 发送方需要私下提供哪些信息
+
+| 变量 | 接收者需要拿到的内容 | 填写注意 |
 | --- | --- | --- |
-| 后端同学 | `backend/`、数据库脚本 | 接口路径、字段或状态码变化，同时更新接口文档并通知前端 |
-| 前端同学 | `frontend/` | 根据契约调整请求、类型和页面；新增依赖同时提交 lock 文件 |
-| 双方 | `README.md`、`对接/`、需求与 SQL | 改同一文件前沟通；数据库结构修改提供后续增量脚本和执行说明 |
+| `AMAP_KEY` | 高德开放平台的 **Web 服务** 类型 Key | 供后端地点搜索使用，填写 Key 原文 |
+| `AI_API_KEY` | 模型服务的 API Key | 填密钥原文，不在前面加 `Bearer ` |
+| `AI_BASE_URL` | 与这把 AI Key 配套的 OpenAI 兼容 API 根地址 | 使用提供者已经验证过的地址 |
+| `AI_MODEL` | 这把 Key 实际可调用的模型 ID | 使用接口模型列表的 `id`，不是模型展示名称 |
 
-### 5.1 开始新任务
+请把 AI 的后三项作为一组信息一起交接，避免只拿到 Key，却填了其他服务商的地址或模型。两个人共用服务账号的配额和余额，提供者更新或撤销 Key 后，接收者也需要更新本机配置。
 
-先用 `git status` 确认当前工作已提交或妥善暂存，再执行：
+数据库地址、数据库密码、`JWT_SECRET` 按接收者本机配置，参考前面的数据库章节；共享 API 时只需要提供上面对应服务的信息。
+
+### 2. 推荐方式：在 `.env.local` 中填写
+
+在接收者的项目根目录操作。首次没有本地配置文件时才复制模板：
+
+```powershell
+if (-not (Test-Path backend/.env.local)) {
+    Copy-Item backend/.env.example backend/.env.local
+}
+```
+
+用 IDEA、VS Code 或文本编辑器打开 `backend/.env.local`。保留已经填好的 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 和 `JWT_SECRET`，找到并修改下面四行，每个变量保留一行：
+
+```dotenv
+AMAP_KEY=替换为私下收到的高德Web服务Key
+AI_API_KEY=替换为私下收到的AI密钥
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL=deepseek-flash
+```
+
+上面以 **DeepSeek 官方服务** 为例。使用其他服务商或兼容服务时，`AI_BASE_URL` 和 `AI_MODEL` 都按发送方提供的信息填写。官方地址及调用格式见 [DeepSeek 接入说明](https://api-docs.deepseek.com/)；模型是否可用以接收时的账号权限和模型列表为准。
+
+本项目后端会在 `AI_BASE_URL` 后调用 `/chat/completions`，因此这里填 API 根地址，不能把完整的 `/chat/completions` 请求地址重复填进去。服务商要求带 `/v1` 前缀时，保留提供者给出的这个前缀。
+
+填写时确认：
+
+- 把 Key 占位说明替换为真实值，只复制密钥本身，避免带入空格、换行或聊天软件的说明文字。
+- 保存为 UTF-8，文件名为 `backend/.env.local`，每行使用 `变量名=值`，不加行尾分号。
+- 配置保存在后端。前端的 `.env` 只放页面和代理配置，`AMAP_KEY`、`AI_API_KEY` 都不放进 `VITE_` 变量。
+- `.env.example` 是公开模板，真实值保留在 `.env.local`。仓库的 `.gitignore` 已忽略本地配置。
+
+从根目录启动后端：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backend/scripts/Start-Backend.ps1
+```
+
+这个启动脚本会加载 `.env.local`。修改 Key、根地址或模型 ID 后，先停止自己原来的后端进程，再重新执行启动命令；只刷新前端页面不会让运行中的后端重新读取这些配置。
+
+### 3. IDEA 绿色运行按钮的配置方式
+
+如果通过 IDEA 运行 `com.travel.TravelApplication`，在 IDEA 中单独设置环境变量：
+
+1. 打开 **Run → Edit Configurations**（运行 → 编辑配置）。
+2. 选择 **Spring Boot → TravelApplication**；如果尚未创建，可先从主类运行一次，再回来编辑。
+3. 点击 **Modify options → Environment variables**，打开环境变量编辑窗口；已有该字段时直接编辑。
+4. 逐项添加 `AMAP_KEY`、`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`，值按前表填写。
+5. 同时确认此运行配置中的 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET` 是接收者自己的有效配置。
+6. 保存到本机运行配置，保持 **Store as project file** 未选中，点击 Apply / OK，停止旧后端再运行。
+
+IDEA 的相关选项见 [Spring Boot 运行配置说明](https://www.jetbrains.com/help/idea/run-debug-configuration-spring-boot.html)。直接点绿色运行按钮时不会自动执行仓库的 `.env.local` 加载脚本；如果改的是 `.env.local`，请使用第 2 节的启动方式，或同步更新真正使用的 IDEA 环境变量。
+
+两种启动方式按自己习惯选择，排查问题时先确认当前使用的是哪一种，修改实际生效的那份配置。
+
+### 4. 高德 Key 在另一台电脑上的注意事项
+
+本项目使用服务端的 **Web 服务 API** 搜索地点。提供者应共享适用于此平台的 Key；JavaScript API 的 Key、安全密钥等不能直接代替这里的 `AMAP_KEY`。对应接口见 [高德地点搜索文档](https://lbs.amap.com/api/webservice/guide/api/newpoisearch)。
+
+如果提供者为 Key 设置了 IP 白名单，需要在高德控制台允许接收者 **运行后端的电脑所使用的公网出口 IP**。两人不在同一个网络时，出口 IP 往往不同；这里与 Navicat 的 `127.0.0.1`、前端的 `localhost:5173` 不是同一个配置。
+
+遇到 `10005 / INVALID_USER_IP` 时，由有权限管理 Key 的提供者核对、更新白名单。Key 平台不匹配可能出现 `10009 / USERKEY_PLAT_NOMATCH`。相关含义见 [高德错误码说明](https://lbs.amap.com/api/webservice/guide/tools/info) 和 [IP 白名单说明](https://lbs.amap.com/faq/webservice/webservice-api/basic-configuration/43238)。
+
+### 5. 怎样确认 AI 模型 ID
+
+优先使用发送方已经验证过的 `AI_BASE_URL` 和 `AI_MODEL`。需要查询 DeepSeek 或提供 `/models` 接口的兼容服务时，在项目根目录的 **PowerShell 终端**执行下面整段命令。它从 `.env.local` 读取 Key，仅显示模型 ID 和名称，不把真实 Key 写到命令中。只在 IDEA 中配置过环境变量的同学，可先把这几项 API 信息填入本机 `.env.local` 再查询：
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command {
+    . ./backend/scripts/Read-LocalEnvironment.ps1 -EnvironmentFile ./backend/.env.local
+    if (-not $env:AI_API_KEY -or -not $env:AI_BASE_URL) {
+        throw '请先在 backend/.env.local 填写 AI_API_KEY 和 AI_BASE_URL'
+    }
+    $headers = @{ Authorization = 'Bearer ' + $env:AI_API_KEY }
+    $models = Invoke-RestMethod -Method Get -TimeoutSec 20 `
+        -Uri ($env:AI_BASE_URL.TrimEnd('/') + '/models') `
+        -Headers $headers
+    $models.data | Select-Object id, name
+}
+```
+
+选择一个服务支持的模型，将其 `id` 原样填到 `AI_MODEL`，保存并重启后端。模型展示名称和调用 ID 可能不同；接口格式见 [DeepSeek 模型列表文档](https://api-docs.deepseek.com/api/list-models/)。
+
+本项目使用 Chat Completions 和 JSON 响应格式。模型列表能读取不代表每个模型都支持这些能力；兼容服务若没有 `/models` 接口，按其控制台或发送方已经验证的模型 ID 配置，再用实际页面验证。
+
+### 6. 重启后怎样验证配置有效
+
+先按数据库章节确认后端就绪，再启动前端并登录自己的有效系统账号。`/health/ready` 的成功只证明数据库就绪，不能证明高德或 AI Key 有效。
+
+**验证高德：**
+
+1. 进入“景点探索”。
+2. 输入一个常见关键词，例如“博物馆”，选择“北京市”，点击搜索。
+3. 能看到真实地点名称和地址列表，即可确认这次高德请求成功。搜索本身不会把结果写入本地景点表。
+
+**验证 AI：**
+
+1. 进入“AI 智能规划”，选择目的地、一天的出行日期和预算。
+2. 创建规划会话，发送一句“请生成一天的旅行方案，只安排两个活动”。
+3. 等待旅行助手的实际回复和右侧草稿方案出现。
+
+一次真实生成会使用共享账号的调用额度，并在应用数据库记录会话。HTTP 202 只是后台受理，不代表模型已经生成成功；等待过程中可刷新会话查看状态，避免反复发送相同生成请求。
+
+接口联调也可使用 `backend/requests.http`。使用自己的系统登录 Token 调用本项目接口；高德 / AI Key 由后端读取，不填写到这些请求的 `Authorization` 中。
+
+### 7. 常见 API 配置问题
+
+| 提示或现象 | 对应检查 |
+| --- | --- |
+| “高德服务未配置” / “AI 服务未配置 API Key” | 核对变量名、值是否为空，以及当前启动方式是否加载了相应配置；重启后端 |
+| 改了 `.env.local` 仍使用旧 Key | 确认不是在运行另一份 IDEA 配置或旧后端进程，更新实际生效的配置后重启 |
+| 高德配置或权限不可用，包含 `10005` | 提供者核对接收者后端的公网出口 IP 是否获准 |
+| 高德配置或权限不可用，包含 `10009` | 核对共享的是 Web 服务平台对应的 Key |
+| AI 外部服务请求失败，页面可能显示 502 | 一起核对 Key、服务商根地址、模型 ID、权限和账户余额；本系统会包装上游错误，不一定直接显示上游状态码 |
+| 模型列表不存在或服务商报模型不存在 | 核对服务商是否提供 `/models`，以及 `AI_MODEL` 是否为实际可调用的 `id` |
+| 429 / 查询过于频繁 / 额度不可用 | 检查共享账号的配额和并发调用，等待后减少重复请求 |
+| AI 回复超时 / 504 | 检查本机到服务商的网络，先刷新会话确认状态，再决定是否重试 |
+| 本系统接口返回 401 或要求重新登录 | 先处理应用登录 Token；它与 `AI_API_KEY`、`JWT_SECRET` 是不同用途的值 |
+| 配置文件在同学克隆后没有出现 | `.env.local` 有意不上传，每个人复制模板后在本机填写私下收到的值 |
+
+未配置外部 Key 时，注册、登录、旅行、手动景点、收藏、行程、消费和统计仍可使用。实时地点搜索和新 AI 回复需要有效服务配置。AI 结果是建议，确认保存才写入正式行程，预计费用与实际消费分开记录；系统不提供距离估算或实时导航。
+
+## 构建与验证
+
+```powershell
+# 根目录：后端独立测试，不依赖日常 MySQL 或真实 AI
+mvn -f backend/pom.xml test
+
+# 根目录：后端打包，数据库 SQL 随 JAR 一同打包
+mvn -f backend/pom.xml -DskipTests package
+
+# 根目录：前端类型检查和生产构建
+npm --prefix frontend run build
+
+# 根目录：受控浏览器场景，不调用付费模型，需要已安装 Edge
+npm --prefix frontend run test:e2e -- boundaries.spec.ts conversation.spec.ts course-compliance.spec.ts
+```
+
+真实 MySQL 验收从 `backend/` 运行 `scripts/Test-MysqlAcceptance.ps1`，使用固定隔离测试库，结束后只清理本次创建的测试库。真实 AI 测试需要显式启用 `RUN_LIVE_AI=true` 或验收脚本的 `-RunLiveAi`，会创建测试数据并可能产生费用。
+
+浏览器截图和运行报告写入已忽略的 `test-results/` / `playwright-report/`，不会重新生成课程提交材料目录。
+
+前端 `dist/` 和后端 `target/` 是构建产物，不提交 Git。公开部署时，为前端配置静态站点、SPA 路由回退及 `/api` 反向代理；后端用环境变量启动 JAR，配置自己的数据库和 HTTPS。Vite 的 `dev` / `preview` 用于本机开发和预览。
+
+## 两人同步代码
+
+约定 `main` 保存可运行版本。在工作已提交的情况下，开始修改前执行：
 
 ```powershell
 git switch main
 git pull --ff-only origin main
-git switch -c backend/improve-trip-validation
 ```
 
-前端可用 `frontend/improve-attraction-form`。每次新任务使用新的分支名，上述名称仅为示例。
-
-### 5.2 修改、验证并提交
-
-在根目录检查并暂存需要提交的文件。后端任务示例：
+修改和验证后，在根目录提交：
 
 ```powershell
-git status
-git diff
-git add backend
-# 如果确实修改了共享文档，再添加对应文档。
-git diff --cached --stat
-git diff --cached
-git commit -m "fix: validate trip dates"
-git push -u origin backend/improve-trip-validation
+git add -A
+git commit -m "说明本次修改"
+git push origin main
 ```
 
-前端同学相应使用 `git add frontend`，推送自己的分支名。暂存前恢复 `backend/requests.http` 中的临时 Token 占位符。提交前执行与改动有关的检查，见第 6 节。
+`git add -A` 包含新增、修改和删除，不包含 Git 已忽略的文件。推送提示 `fetch first` 时，先 `git fetch origin`、`git merge --no-edit origin/main`，处理并提交冲突后再推送；不要覆盖同学的提交。改数据库结构时提供增量 SQL 和对应执行说明，不要求其他人重建已有数据库。
 
-### 5.3 在 GitHub 合并
-
-1. 推送后打开 **Compare & pull request**，或 **Pull requests → New pull request**。
-2. `base` 选 `main`，`compare` 选自己的分支；说明修改内容、验证方法和对方需要执行的 SQL / 配置步骤。
-3. 另一人检查 **Files changed**，确认接口和页面可以衔接后再合并。通过后可用 **Squash and merge**。
-4. 合并后，两人都在工作目录干净时执行 `git switch main`、`git pull --ff-only origin main`。下一项任务再新建分支。
-
-这些是团队约定；私有仓库能否强制分支保护取决于账户方案，不影响先按此流程协作。
-
-### 5.4 分支落后或发生冲突
-
-提交自己的修改后，在自己的任务分支执行：
-
-```powershell
-git fetch origin
-git merge origin/main
-```
-
-出现冲突时，打开冲突文件，和同学确认正确内容，删除 `<<<<<<<`、`=======`、`>>>>>>>` 标记，重新执行有关检查，再暂存实际冲突文件、`git commit`、`git push`。若依赖文件冲突，先确定 `package.json` 的正确依赖，再用 npm 更新对应 lock 文件。
-
-暂时不能决定冲突内容时，可用 `git merge --abort` 退出这次合并，先沟通再处理。不要用强制推送或删除同学代码来解决冲突。
-
-## 6. 提交前验证
-
-只改文档时核对命令、路径和链接；改代码时按涉及范围执行：
-
-| 检查 | 执行位置与命令 | 说明 |
-| --- | --- | --- |
-| 后端默认测试 | `backend/`：`mvn test` | 默认独立测试库，无需日常 MySQL 或真实 AI；MySQL 专项验收需显式启用 |
-| 前端类型与构建 | `frontend/`：`npm run build` | 包含 TypeScript 检查，输出 `dist/`，产物不提交 |
-| 前端边界测试 | `frontend/`：`npm run test:boundaries` | 受控响应，不调用真实 AI、不需要后端；需要 Edge 和前端依赖 |
-| 浏览器联调 | 见下方 | 需要真实后端和数据库；完整套件含真实 AI 调用、产生测试数据并可能计费 |
-
-同学首次克隆后没有原电脑的 IDEA 私有配置，建议自己先启动后端，再使用已有服务验收。从 `frontend/` 执行：
-
-```powershell
-# 完整验收：后端应已配置高德与 AI 服务。
-.\scripts\Test-Integration.ps1 -UseExistingBackend -BackendUrl 'http://127.0.0.1:8080'
-
-# 只验收景点预填、保存与行程关联：使用受控高德响应，不调用 AI。
-.\scripts\Test-Integration.ps1 -UseExistingBackend -BackendUrl 'http://127.0.0.1:8080' -TestFile poi-prefill.spec.ts
-```
-
-脚本默认另开前端 5175。MySQL 事务专项验收、自动启动独立后端等进阶用法见[后端说明](backend/README.md)和[前端说明](frontend/README.md)。已有 `acceptance/` 报告记录的是当时验收结果，报告里的 ID 不代表新数据库中的 ID。
-
-手工联调可使用 `backend/requests.http`：先登录，使用返回的 `accessToken` 调受保护接口，用自己数据库实际返回的旅行 / 景点 / AI 方案 ID 替换示例值。
-
-## 7. 密钥与配置的提交约定
-
-- 共享变量名和不含秘密的 `.env.example`，两人各自设置真实值。
-- `.gitignore` 已排除 IDEA 私有配置、本机环境文件、构建产物和测试运行输出；不要使用 `git add -f` 绕过规则。
-- 使用上面的 Git 流程上传。网页拖拽上传、截图或手工新建文件时，也要检查内容；`.gitignore` 不是内容脱敏工具。
-- 前端只保留公开配置，第三方请求由后端携带 Key 发出。私有仓库也不存真实密钥。
-- 若密钥已经提交或推送，先在服务平台撤销并生成新密钥，再处理文件和历史；只改当前文件、补忽略规则或改为私有，无法抹掉已有历史副本。
-
-## 8. 常见问题
+## 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
-| 同学没有账号或看不到我的旅行 | Git 不同步数据库；在自己的库初始化测试数据或注册。需要同一份数据时按第 3.4 节连接同一后端 |
-| 登录 500 / 就绪检查失败 | 检查 MySQL 启动状态，以及 DB_URL 端口、库名、用户名和密码是否与 Navicat 一致，查看后端日志 |
-| 登录后提示过期 | JWT 有效期 24 小时；更换密钥或切换不同后端后重新登录 |
-| AI / 高德未配置或超时 | 检查后端变量、服务权限 / 余额、模型 ID 和网络，修改后重启后端 |
-| Git 推送认证失败 | 按上方凭据文档用 GCM 浏览器登录，确认当前账号有仓库权限 |
-| 首次推送提示远程存在提交 | 检查是否创建仓库时勾选 README；先核对远程和本地内容，不要强制覆盖 |
-| 切换分支提示有本地改动 | 先用 git status 查看，提交或妥善暂存，不要直接丢弃修改 |
-| 拉取后前端缺依赖 | 在 frontend/ 运行 npm ci；修改依赖时同时提交 package.json 和 package-lock.json |
-| 拉取后数据库缺字段 | 查看 PR 和增量 SQL；git pull 不会修改数据库，不要重复导入整套演示数据 |
-| 5173 / 8080 被占用 | 关闭自己重复启动的服务，或同步修改端口与代理；前端固定端口不会自动跳到其他端口 |
+| `mvn` / `java` 找不到 | 配置 Maven 的 PATH、JDK 的 `JAVA_HOME`，重新打开终端 |
+| 数据库连接失败 | 确认 MySQL 已启动、端口和密码正确，`DB_URL` 的库已初始化 |
+| 缺少 `JWT_SECRET` | 填写 `.env.local`，使用启动脚本；IDE 启动须单独配置环境变量 |
+| 新电脑不能用原账号登录 | 数据库没有随 Git 同步；新库请自行注册 |
+| 前端提示无法连接后端 | 先检查后端 `/health/ready`，再检查 `VITE_PROXY_TARGET` |
+| 5173 / 8080 被占用 | 使用已有服务或关闭自己此前启动的服务；改端口时同步代理和 CORS |
+| 多轮聊天提示表未升级 | 旧 8 表数据库执行后端的 `upgrade-chat.sql`；新安装已包含聊天表 |
+| 高德或 AI 提示未配置 | 在后端填写相应 Key 后重启后端 |
 
-日常顺序：**同步 main → 新建任务分支 → 修改和验证 → 提交 / 推送 → PR 检查合并 → 双方同步 main**。
-
-## 9. 旅行规划体验更新（2026-11-23）
-
-AI 页面改为可一次填写、随时修改的旅行需求表，已有旅行自动带入城市、日期与预算；自然语言要求和偏好会一起发送给模型。生成后直接进入方案编辑，可按新要求生成另一版、调整活动顺序，在当前窗口恢复未保存修改，或不离开页面就创建日期匹配的旅行。
-
-景点探索和收藏详情可直接选择旅行、日期并加入行程；景点名称、关联 ID、参考费用和建议时长自动带入。旅行内“挑选景点”会携带旅行上下文。从某个活动点击“记消费”会带入活动名与日期，实际金额必须手填。
-
-距离预估与核验模块已移除。AI生成的简称、餐饮区域和不确定分店不能稳定用于路径计算；当前版本不展示该类距离、交通用时或候选地点列表。景点探索保留高德实时搜索。
-
-此次无数据库结构变更，不需要重新执行初始化 SQL。更新后重启后端与前端。
-
-## 10. 多轮旅行对话（2026-11-25）
-
-AI 首页填写条件后进入持续聊天工作区：左侧保存消息，右侧按天浏览行程、按需编辑和确认保存。支持自动判断、只问问题、调整方案；模型会参考历史消息、偏好摘要和当前用户编辑。旧 AI 方案可“在会话中继续讨论”，会话可在首页恢复或删除，正式旅行与消费不会因聊天自动改变。
-
-右侧默认是单日时间线，只展示时间、活动名称、预计费用与备注。顶部切换日期，点击活动“编辑”才打开表单；支持添加、排序、移除、撤销上次修改和编辑当天说明。“让 AI 调整这一天”会把日期带入输入框，用户点击发送后才调用模型。
-
-聊天等待期间每2.5秒查询结果，也可点“查询发送状态”；失败重试在页面合并同内容气泡，输入与手工编辑继续保留。模型输出按天数分配长度，兼容额外说明字段、整段JSON代码块和常见时间表示；截断或损坏的回复会保留原方案并明确提示。模型失败不会自动再次付费调用。
-
-本机已通过增量脚本创建聊天表；同学拉取代码后需要在自己的数据库执行04，再启动后端。也可运行 backend/scripts/Install-ChatSchema.ps1。配置仍只在后端，API Key 不提交 GitHub。完整接口、升级、并发与失败恢复说明见 [多轮对话模块说明](对接/AI多轮对话_接口与升级说明.md)。
-
-
-## 11. 当前界面与距离模块调整（2026-11-25）
-
-当前版本已删除距离核验组件、前端调用及`/api/pois/route`、`/api/pois/routes`接口（登录后返回404）。右侧采用`PlanTimeline`单日时间线；页面滚动和表单数量不再随旅行天数成倍增加。费用仍为建议金额，不写成实际消费；保存和覆盖确认机制不变。
-
-更新代码后重启后端与前端；已执行04的数据库不需要再导入SQL。旧的路线验收图片和记录仅描述历史版本。
-
-新版已通过后端54项默认测试、完整36项浏览器回归，以及后续新增状态/长行程场景的针对性复测；生产构建通过。真实一日与四日多轮、编辑后保存、覆盖确认和消费保留均已验收。详见[当前版验收记录](frontend/acceptance/ux-simplification-2026-11-25.json)与[重庆行程界面](frontend/acceptance/ai-chongqing-redesign.png)。
-
-## 12. 手工活动按时间归位（2026-11-25）
-
-新增手工活动填了开始时间，会自动排入当天相应位置；从景点探索加入旅行和AI草稿弹窗添加也支持。修改开始时间会自动归位，同一时间保持稳定顺序，未填开始时间先放在末尾。时间重叠会提示，其他活动的时间保持原样。旧版本已经错序的当天，可点“按时间整理”一次修复；上下箭头仍用于自定义顺序。
-
-更新后重启后端与前端即可，不需要修改数据库或API Key。
-
-本次后端59项默认测试通过；37个浏览器场景分阶段验证完成，其中全部聊天和真实时间归位24项最终复测通过。已验证16点手工活动插入、改时间后归位、刷新后的持久化、所选日期与景点关联、建议游玩时长，以及原时间/消费保留。详见[验收记录](frontend/acceptance/manual-time-placement-2026-11-25.json)与[自动归位效果](frontend/acceptance/manual-time-placement-2026-11-25.png)。
-
-## 9. 课程界面与数据规范
-
-正式列表固定每页20条，右下角同时显示页码、总数和当前记录范围；检索条件在翻页时保留。日期、金额右对齐，长文本省略并可悬浮查看。行操作仅保留详情，编辑、删除在详情中执行。
-
-普通接口超过3秒无响应会显示可恢复的超时状态。AI页面使用 `POST /api/ai/conversations/{id}/messages/submit` 快速返回202受理回执，再每2.5秒查询会话状态；生成中可以离开并回来查看，失败可手动重试。旧同步 `/messages` 和 `/ai/plans` 接口仅为兼容保留，页面生成不再等待这些长请求。模型生成速度由外部服务决定，202受理不等于已经生成完毕。
-
-前后端与数据库都校验输入；服务端可定位的错误通过 `data.fieldErrors` 显示在字段下方，其他错误持续显示在表单内。所有多表写入使用事务；列表由SQL分页，关联查询使用JOIN或聚合，SQL及数据库探测集中在数据访问层。物理删除通过外键CASCADE或SET NULL处理关联，确认框明确对象与后果。
-
-## 10. 验证与交付
-
-```powershell
-# 前端类型检查和构建
-npm --prefix frontend run build
-# 后端基础回归；MySQL专项默认不自动开启
-mvn -f backend/pom.xml test
-# 浏览器规范与对话测试（受控接口，不调用付费模型）
-npm --prefix frontend run test:e2e -- course-compliance.spec.ts conversation.spec.ts
-```
-
-真实MySQL专项：在后端目录运行 `scripts/Test-MysqlAcceptance.ps1`，输入本机连接参数。测试只创建固定的 `travel_acceptance_course`，同名库存在时拒绝运行，结束后只删除本次成功创建的测试库。不要并发运行两份此测试。
-
-最终提交材料在 `课程设计提交材料/`。报告须包括四态截图、六类缺陷自查和部署演练记录。系统录屏控制在三分钟内。姓名和学号末三位由两位同学填写，不能用示例人物代替本人。
-
-提交前执行 `git status` 和 `git diff --cached --stat`，确保源码、根目录schema、SQL增量及提交材料都已提交，`.env.local`、IDE配置、依赖和构建产物没有被提交。不要只提交当前打开的某个子目录。
+更多开发说明见 [后端 README](backend/README.md) 和 [前端 README](frontend/README.md)。

@@ -3,8 +3,10 @@ from pathlib import Path
 import re
 
 root = Path(__file__).parent
-schema = (root.parent / 'ER图和Mysql/01_建库建表_MySQL8.sql').read_text(encoding='utf-8')
+schema = (root / 'src/main/resources/db/mysql/schema.sql').read_text(encoding='utf-8')
 for table, body in re.findall(r'CREATE TABLE IF NOT EXISTS `(\w+)` \((.*?)\n\) ENGINE', schema, re.S):
+    if table in {'ai_conversation', 'ai_chat_message'}:
+        continue
     name = ''.join(s.title() for s in table.split('_'))
     columns = re.findall(r'^  `(\w+)` (\w+)', body, re.M)
     camel = lambda s: re.sub(r'_([a-z])', lambda m: m[1].upper(), s)

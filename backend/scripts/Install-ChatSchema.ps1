@@ -1,5 +1,6 @@
 ﻿param([switch]$UseIdeaConfiguration,[string]$JavaHome=$env:JAVA_HOME)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Read-LocalEnvironment.ps1') -EnvironmentFile (Join-Path $PSScriptRoot '../.env.local')
 $backendRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $saved=@{}
 try {
@@ -20,7 +21,7 @@ try {
     $connectorRoot=Join-Path $env:USERPROFILE '.m2/repository/com/mysql/mysql-connector-j'
     $jar=Get-ChildItem -LiteralPath $connectorRoot -Recurse -Filter 'mysql-connector-j-*.jar' | Where-Object {$_.Name -notmatch 'sources|javadoc'} | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if($null -eq $jar) {throw 'MySQL driver not found; import the backend Maven project first.'}
-    $sql=Join-Path $backendRoot '../ER图和Mysql/04_AI多轮会话_增量升级.sql'
+    $sql=Join-Path $backendRoot 'src/main/resources/db/mysql/upgrade-chat.sql'
     & (Join-Path $JavaHome 'bin/java.exe') --class-path $jar.FullName (Join-Path $PSScriptRoot 'InstallChatSchema.java') $sql
     if($LASTEXITCODE -ne 0) {throw 'Chat schema upgrade failed; original application tables were not modified.'}
 } finally {

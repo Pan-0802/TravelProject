@@ -1,9 +1,0 @@
-{
-  "result": "PASS",
-  "baseURL": "http://127.0.0.1:4173",
-  "tripId": "10",
-  "items": 9,
-  "login": true,
-  "chart": true,
-  "runtimeErrors": []
-}

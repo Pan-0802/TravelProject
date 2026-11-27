@@ -9,9 +9,9 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.EncodedResource;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -40,11 +40,7 @@ class MysqlAcceptanceTest extends BackendIntegrationTest {
         }
         databaseUrl=serverUrl.replaceFirst("/(\\?|$)","/travel_acceptance_course$1");
         try(var connection=DriverManager.getConnection(databaseUrl,username(),password())) {
-            String ddl=Files.readString(Path.of("../ER图和Mysql/01_建库建表_MySQL8.sql"),StandardCharsets.UTF_8)
-                .replaceFirst("(?is)CREATE DATABASE IF NOT EXISTS.*?;", "")
-                .replaceAll("(?im)^USE\\s+.*?;", "")
-                .replaceAll("(?im)^SET NAMES\\s+.*?;", "");
-            ScriptUtils.executeSqlScript(connection,new ByteArrayResource(ddl.getBytes(StandardCharsets.UTF_8)));
+            ScriptUtils.executeSqlScript(connection,new EncodedResource(new ClassPathResource("db/mysql/schema.sql"),StandardCharsets.UTF_8));
         } catch(Exception e) { cleanup(); throw e; }
         registry.add("spring.datasource.url", () -> databaseUrl);
         registry.add("spring.datasource.username", MysqlAcceptanceTest::username);

@@ -1,7 +1,7 @@
 import {test,expect,type Page} from '@playwright/test'
 import {mkdirSync} from 'node:fs'
 
-const screenshots='../课程设计提交材料/验收截图'
+const screenshots='test-results/course-compliance-screenshots'
 const trip=(id=1)=>({tripId:String(id),title:'规范验收旅行'+id,destination:'北京',startDate:'2026-12-01',endDate:'2026-12-03',daysCount:3,totalBudget:1500,actualExpense:65,tripStatus:'NOT_STARTED',createdAt:'2026-11-27T10:00:00'})
 const ok=(data:unknown)=>({code:0,message:'success',data})
 type State={mode:'normal'|'empty'|'error'|'slow'|'long';queries:URLSearchParams[];writes:number}
