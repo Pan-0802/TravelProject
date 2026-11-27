@@ -167,16 +167,15 @@ async function savePassword() {
 
 <style scoped>
 .profile-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap:16px;
   align-items: stretch;
 }
 
 /* 三张卡片等宽等高：flex 拉伸保证上边界、下边界都对齐 */
 .profile-grid > .tp-card {
-  flex: 1 1 0;
-  min-width: 340px;
+  min-width: 0;
   margin-top:0;
   display: flex;
   flex-direction: column;
@@ -200,8 +199,11 @@ async function savePassword() {
 }
 
 .card-tip {
-  margin:-8px 0 12px;
+  margin:0 0 16px;
+  line-height:1.6;
 }
+
+.profile-grid :deep(.el-descriptions__cell) { overflow-wrap:anywhere; }
 
 .profile-head {
   display: flex;

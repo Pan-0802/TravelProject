@@ -13,7 +13,9 @@ export function useFormErrors(aliases: Record<string, string> = {}) {
     clearErrors()
     const api = error as ApiError
     Object.entries(api.fieldErrors || {}).forEach(([key, message]) => {
-      fieldErrors[aliases[key] || key] = message
+      const unindexed = key.replace(/\[\d+\]/g, '')
+      const target = aliases[key] || aliases[unindexed] || key.replace(/\[(\d+)\]/g, '.$1')
+      fieldErrors[target] ||= message
     })
     submitError.value = errorMessage(error, '保存未完成，请检查填写内容后重试；已填写的信息会保留。')
   }

@@ -67,10 +67,10 @@
       </template>
     </el-result>
 
-    <template v-else-if="plan">
+    <el-form v-else-if="plan" :model="{tripId:selectedTripId,days}" :disabled="saving" class="plan-editor" @submit.prevent="handleSave">
       <!-- 保存目标 -->
       <div class="tp-card tp-card__body save-bar">
-        <div class="save-bar__field">
+        <el-form-item class="save-bar__field" prop="tripId" :error="fieldErrors.tripId">
           <span class="save-bar__label">保存到旅行</span>
           <el-select
             v-model="selectedTripId"
@@ -88,7 +88,7 @@
           <el-button v-if="isDraft && !plan.tripId" text type="primary" @click="createTripVisible = true">
             按此方案创建旅行
           </el-button>
-        </div>
+        </el-form-item>
         <div class="save-bar__hint">
           <el-alert
             v-if="tripMismatch"
@@ -146,6 +146,7 @@
         <div v-for="(item, itemIndex) in day.items" :key="itemIndex" class="item-editor">
           <div class="item-editor__top">
             <span class="activity-index">{{ itemIndex + 1 }}</span>
+            <el-form-item class="item-time-field" :prop="itemPath(dayIndex,itemIndex,'endTime')" :error="itemError(dayIndex,itemIndex,'endTime') || itemError(dayIndex,itemIndex,'startTime')">
             <el-time-picker
               v-model="item.startTime"
               @change="autoSchedule(dayIndex,itemIndex)"
@@ -166,6 +167,8 @@
               style="width: 118px"
               :disabled="!isDraft"
             />
+            </el-form-item>
+            <el-form-item class="item-name-field" :prop="itemPath(dayIndex,itemIndex,'itemName')" :error="itemError(dayIndex,itemIndex,'itemName')">
             <el-input
               v-model.trim="item.itemName"
               size="small"
@@ -174,6 +177,7 @@
               class="item-name"
               :disabled="!isDraft"
             />
+            </el-form-item>
             <el-button text type="danger" size="small" :disabled="!isDraft" @click="removeItem(dayIndex, itemIndex)">
               删除
             </el-button>
@@ -183,6 +187,7 @@
 
           <div class="item-meta"><span>预计 {{ money(item.estimatedCost) }} · {{ item.transportation || '交通待定' }}</span><el-button text size="small" @click="expanded=expanded===day.date+itemIndex?'':day.date+itemIndex">{{ expanded===day.date+itemIndex?'收起详情':'费用、景点与备注' }}</el-button></div>
           <div v-show="expanded===day.date+itemIndex" class="item-editor__bottom">
+            <el-form-item class="item-short-field" :prop="itemPath(dayIndex,itemIndex,'transportation')" :error="itemError(dayIndex,itemIndex,'transportation')">
             <el-select
               v-model="item.transportation"
               size="small"
@@ -196,7 +201,9 @@
             >
               <el-option v-for="t in TRANSPORTATION_OPTIONS" :key="t" :label="t" :value="t" />
             </el-select>
+            </el-form-item>
 
+            <el-form-item class="item-short-field" :prop="itemPath(dayIndex,itemIndex,'estimatedCost')" :error="itemError(dayIndex,itemIndex,'estimatedCost')">
             <el-input-number
               v-model="item.estimatedCost"
               size="small"
@@ -208,7 +215,9 @@
               style="width: 140px"
               :disabled="!isDraft"
             />
+            </el-form-item>
 
+            <el-form-item class="item-place-field" :prop="itemPath(dayIndex,itemIndex,'attractionId')" :error="itemError(dayIndex,itemIndex,'attractionId')">
             <el-select
               v-model="item.attractionId"
               @change="(id: string) => linkAttraction(item, id)"
@@ -226,7 +235,9 @@
                 :value="attraction.attractionId"
               />
             </el-select>
+            </el-form-item>
 
+            <el-form-item class="item-note-field" :prop="itemPath(dayIndex,itemIndex,'note')" :error="itemError(dayIndex,itemIndex,'note')">
             <el-input
               v-model="item.note"
               size="small"
@@ -235,15 +246,17 @@
               class="item-note"
               :disabled="!isDraft"
             />
+            </el-form-item>
           </div>
         </div>
       </div>
 
+      <el-alert v-if="submitError && isDraft" :title="submitError" type="error" :closable="false" show-icon role="alert"/>
       <div class="bottom-actions" v-if="isDraft">
         <el-button @click="router.push('/ai')">取消</el-button>
         <el-button type="primary" :loading="saving" @click="handleSave">确认保存到旅行</el-button>
       </div>
-    </template>
+    </el-form>
     <TripFormDialog v-if="plan" v-model="createTripVisible" :prefill="{title:plan.destination+'旅行',destination:plan.destination,startDate:plan.startDate,endDate:plan.endDate,totalBudget:plan.request?.totalBudget ?? editedTotal}" @saved="tripCreated" />
   </div>
 </template>
@@ -251,7 +264,8 @@
 <script setup lang="ts">
 import RequestError from "@/components/common/RequestError.vue"
 import {errorMessage} from "@/utils/request"
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useFormErrors } from '@/utils/formErrors'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import {byStartTime,insertByTime,needsTimeOrder} from '@/utils/schedule'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -277,6 +291,15 @@ const selectedTripId = ref('')
 const loading = ref(false)
 const loadFailure=ref('')
 const saving = ref(false)
+const {fieldErrors,submitError,clearErrors,showError}=useFormErrors()
+function itemPath(day:number,index:number,field:string){return `days.${day}.items.${index}.${field}`}
+function itemError(day:number,index:number,field:string){return fieldErrors[itemPath(day,index,field)]}
+async function revealFieldError(){
+  const first=Object.keys(fieldErrors)[0],match=first?.match(/^days\.(\d+)\.items\.(\d+)\.(\w+)/)
+  if(match&&['transportation','estimatedCost','attractionId','note'].includes(match[3]!))expanded.value=days.value[Number(match[1])]?.date+match[2]!
+  await nextTick()
+  document.querySelector<HTMLElement>('.plan-editor .el-form-item.is-error')?.scrollIntoView({block:'center'})
+}
 const openingChat=ref(false)
 async function openConversation(){if(!plan.value)return;openingChat.value=true;try{const chat=await conversationApi.create({aiPlanId:plan.value.aiPlanId,...(dirty.value?{currentDays:buildDays()}:{})});allowLeave=true;await router.push('/ai/chat/'+chat.conversationId)}catch(e){ElMessage.error((e as Error).message)}finally{openingChat.value=false;allowLeave=false}}
 const expanded = ref('')
@@ -412,31 +435,32 @@ function removeItem(dayIndex: number, itemIndex: number) {
 
 function validate(): string | null {
   if (!plan.value) return '方案未加载'
-  if (!selectedTripId.value) return '请先选择要保存到的旅行'
-  if (!selectedTrip.value) return '目标旅行不存在或尚未加载，请刷新后重试'
-  if (plan.value.tripId && selectedTripId.value !== plan.value.tripId) return '该草稿只能保存到原关联旅行'
-  if (tripMismatch.value) return '所选旅行目的地或日期与方案不一致，请更换旅行或重新生成方案'
+  if (!selectedTripId.value) fieldErrors.tripId='请先选择要保存到的旅行'
+  else if (!selectedTrip.value) fieldErrors.tripId='目标旅行不存在或尚未加载，请刷新后重试'
+  else if (plan.value.tripId && selectedTripId.value !== plan.value.tripId) fieldErrors.tripId='该草稿只能保存到原关联旅行'
+  else if (tripMismatch.value) fieldErrors.tripId='请选择目的地和日期与方案一致的旅行'
 
   if (days.value.length !== plan.value.travelDays) {
     return `方案应包含 ${plan.value.travelDays} 天，当前为 ${days.value.length} 天，请重新加载后再保存`
   }
 
-  for (const day of days.value) {
+  for (const [dayIndex,day] of days.value.entries()) {
     if (day.items.length > 50) return `${day.date} 最多50个活动`
-    for (const item of day.items) {
+    for (const [itemIndex,item] of day.items.entries()) {
       if (!item.itemName || !item.itemName.trim()) {
-        return `${day.date} 存在未填写名称的活动，请补全或删除`
-      }
+        fieldErrors[itemPath(dayIndex,itemIndex,'itemName')]='请填写活动名称，或移除这项空白活动'
+      } else if(item.itemName.length>150)fieldErrors[itemPath(dayIndex,itemIndex,'itemName')]='活动名称最多150字，请缩短后重试'
       if (item.startTime && item.endTime && item.endTime < item.startTime) {
-        return `${day.date} 的「${item.itemName}」结束时间早于开始时间`
+        fieldErrors[itemPath(dayIndex,itemIndex,'endTime')]='结束时间不能早于开始时间，请调整时间段'
       }
       if (!Number.isFinite(Number(item.estimatedCost)) || Number(item.estimatedCost) < 0 || Number(item.estimatedCost) > 99999999.99) {
-        return `${day.date} 的「${item.itemName}」预估费用需在0至99999999.99之间`
+        fieldErrors[itemPath(dayIndex,itemIndex,'estimatedCost')]='请填写0至99999999.99元之间的费用'
       }
-      if ((item.transportation?.length || 0) > 60) return '交通方式最多60字'
+      if ((item.transportation?.length || 0) > 60)fieldErrors[itemPath(dayIndex,itemIndex,'transportation')]='交通方式最多60字，请缩短后重试'
+      if((item.note?.length||0)>500)fieldErrors[itemPath(dayIndex,itemIndex,'note')]='备注最多500字，请精简后重试'
     }
   }
-  return null
+  return Object.keys(fieldErrors).length?'请修改标红的项目后再保存，当前编辑内容会保留。':null
 }
 
 function buildDays(): AiPlanDay[] {
@@ -473,9 +497,11 @@ async function submitSave(confirmOverwrite: boolean) {
 async function handleSave() {
   if (saving.value || refining.value || !plan.value) return
 
+  clearErrors()
   const error = validate()
   if (error) {
-    ElMessage.warning(error)
+    submitError.value=error
+    await revealFieldError()
     return
   }
 
@@ -514,10 +540,12 @@ async function handleSave() {
         await submitSave(true)
       } catch (retryError) {
         if (errorCode(retryError) === 40900) await loadPlan()
-        ElMessage.error((retryError as Error).message || '保存失败')
+        showError(retryError)
+        await revealFieldError()
       }
     } else {
-      ElMessage.error((err as Error).message || '保存失败')
+      showError(err)
+      await revealFieldError()
     }
   } finally {
     saving.value = false
@@ -675,4 +703,17 @@ onBeforeRouteLeave(async()=>{
   gap:8px;
   padding:4px 0 24px;
 }
+.plan-editor :deep(.el-form-item__content) { min-width:0; }
+.plan-editor .item-editor .el-form-item { margin-bottom:0; }
+.item-time-field { flex:0 1 268px;max-width:100%; }
+.item-time-field :deep(.el-form-item__content) { gap:8px; }
+.item-time-field :deep(.el-date-editor) { width:0 !important;min-width:0;flex:1; }
+.item-name-field { flex:1;min-width:180px; }
+.item-name-field .item-name { width:100%;min-width:0; }
+.item-short-field { width:140px; }
+.item-place-field { width:220px;max-width:100%; }
+.item-note-field { flex:1;min-width:180px; }
+.item-note-field .item-note { min-width:0;width:100%; }
+.item-editor__top,.item-editor__bottom { align-items:flex-start; }
+.save-bar__field :deep(.el-select) { max-width:100%; }
 </style>

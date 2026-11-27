@@ -13,7 +13,7 @@
     <el-alert v-if="contextTrip" type="info" :closable="false" :title="'正在为「'+contextTrip.title+'」挑选景点，保存后可直接安排到某一天。'" style="margin-bottom:16px"><el-button text type="primary" @click="router.push('/trips/'+contextTrip.tripId)">返回旅行</el-button></el-alert>
     <div v-if="recentAttraction" class="tp-card tp-card__body" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>「{{ recentAttraction.name }}」已保存，接下来安排到哪一天？</span><el-button type="primary" @click="addToTrip(recentAttraction)">加入旅行行程</el-button></div>
     <!-- 高德实时 POI -->
-    <div class="tp-card tp-card__body">
+    <div class="tp-card tp-card__body poi-search">
       <div class="section-head">
         <div>
           <h2 class="section-title">高德实时搜索</h2>
@@ -22,17 +22,17 @@
         <el-tag type="info" effect="plain">实时查询 · 确认后录入</el-tag>
       </div>
 
-      <div class="tp-toolbar">
+      <div class="tp-toolbar poi-search__toolbar">
         <el-input
           v-model.trim="poiQuery.keywords"
           placeholder="关键词，如：博物馆"
           clearable
           maxlength="80"
-          style="width: 260px"
+          class="poi-search__keywords"
           :prefix-icon="Search"
           @keyup.enter="searchPoi"
         />
-        <CityCascader v-model="poiQuery.region" placeholder="选择省市" width="200px" @change="searchPoi" />
+        <CityCascader v-model="poiQuery.region" class="poi-search__city" placeholder="选择省市" width="200px" @change="searchPoi" />
         <el-switch v-model="poiQuery.cityLimit" active-text="仅限本市" />
         <el-button type="primary" :loading="poiLoading" @click="searchPoi">搜索</el-button>
       </div>
@@ -44,27 +44,35 @@
           :description="poiSearched ? '没有找到相关地点，换个关键词试试' : '输入关键词与城市，查询高德实时地点'"
         />
 
-        <div v-else class="poi-grid">
-          <div v-for="(poi, index) in poiList" :key="`${poi.name}-${index}`" class="poi-card">
+        <template v-else-if="poiList.length">
+        <div class="poi-results-summary">
+          <span>找到 <strong>{{ poiList.length }}</strong> 个地点</span>
+          <span>选择地点，确认后录入</span>
+        </div>
+        <div class="poi-grid">
+          <article v-for="(poi, index) in poiList" :key="`${poi.name}-${index}`" class="poi-card">
             <div class="poi-card__head">
               <h3 class="poi-card__name" :title="poi.name">{{ poi.name }}</h3>
-              <el-tag v-if="poi.type" class="poi-card__category" :title="poi.type" size="small" effect="plain" type="info">{{ poiCategory(poi.type) }}</el-tag>
+              <el-tag v-if="poi.type" class="poi-card__category" :title="poi.type" size="small" effect="light">{{ poiCategory(poi.type) }}</el-tag>
             </div>
-            <p class="poi-card__addr">
-              <el-icon><Location /></el-icon>
-              {{ poi.address || '地址未提供' }}
-            </p>
             <p class="poi-card__meta">
-              <span>{{ poi.city || '—' }}{{ poi.district ? ' · ' + poi.district : '' }}</span>
-              <span v-if="poi.longitude !== null && poi.latitude !== null" class="coord">
-                {{ poi.longitude }}, {{ poi.latitude }}
-              </span>
+              <el-icon><Location /></el-icon>
+              <span :title="[poi.city, poi.district].filter(Boolean).join(' · ')">{{ poi.city || '城市未提供' }}{{ poi.district ? ' · ' + poi.district : '' }}</span>
             </p>
-            <el-button size="small" plain type="primary" @click="createFromPoi(poi)">
-              录入景点
-            </el-button>
-          </div>
+            <p class="poi-card__addr">
+              <span :title="poi.address || undefined">{{ poi.address || '地址未提供' }}</span>
+            </p>
+            <div class="poi-card__footer">
+              <el-tooltip v-if="poi.longitude != null && poi.latitude != null" :content="`经纬度：${poi.longitude}, ${poi.latitude}`" :trigger="['hover', 'focus', 'click']" :disabled="formVisible" placement="top">
+                <button type="button" class="poi-card__coordinates" :aria-label="`查看${poi.name}的经纬度`">查看坐标</button>
+              </el-tooltip>
+              <el-button size="small" plain type="primary" :icon="Plus" @click="createFromPoi(poi)">
+                录入景点
+              </el-button>
+            </div>
+          </article>
         </div>
+        </template>
       </div>
     </div>
 
@@ -78,7 +86,7 @@
         <span class="tp-muted">共 {{ attractionTotal }} 个</span>
       </div>
 
-      <div class="tp-toolbar">
+      <div class="tp-toolbar attraction-filters">
         <el-input
           v-model.trim="attrQuery.keyword"
           placeholder="搜索景点名称"
@@ -97,7 +105,7 @@
       </div>
 
       <RequestError :message="attrFailure" :loading="attrLoading" @retry="loadAttractions"/>
-      <el-table v-if="!attrFailure" v-loading="attrLoading" :data="attractions" stripe row-key="attractionId">
+      <el-table v-if="!attrFailure" v-loading="attrLoading" :data="attractions" class="attraction-table" stripe row-key="attractionId">
         <el-table-column prop="name" label="景点名称" min-width="200" show-overflow-tooltip/>
         <el-table-column prop="city" label="城市" min-width="120" show-overflow-tooltip/>
         <el-table-column prop="category" label="分类" min-width="120" show-overflow-tooltip/>
@@ -287,8 +295,30 @@ onMounted(async()=>{if(route.query.tripId){try{contextTrip.value=await tripApi.d
 
 .section-desc {
   margin:0;
-  font-size: var(--tp-font-title);
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
+  line-height: 1.6;
+}
+
+.poi-search__toolbar {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  padding: 16px;
+  background: #f5f8ff;
+  border: 1px solid #e8eefb;
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.poi-search__keywords {
+  width: 300px;
+  max-width: 100%;
+}
+
+.poi-search__keywords,
+.poi-search__toolbar :deep(.el-cascader),
+.poi-search__toolbar .el-switch {
+  flex-shrink: 0;
 }
 
 .poi-area {
@@ -297,27 +327,49 @@ onMounted(async()=>{if(route.query.tripId){try{contextTrip.value=await tripApi.d
 
 .poi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap:12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+
+.poi-results-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-font-body);
+}
+
+.poi-results-summary strong {
+  color: var(--tp-primary);
+  font-weight: 600;
 }
 
 .poi-card {
   min-width: 0;
-  border: 1px solid var(--tp-border);
+  border: 1px solid #e2e8f2;
   border-radius: 10px;
-  padding:12px;
-  background: #fbfcff;
+  padding: 16px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap:8px;
+  gap: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.poi-card:hover,
+.poi-card:focus-within {
+  border-color: #b3cbfb;
+  box-shadow: 0 4px 16px rgba(63, 126, 247, 0.08);
 }
 
 .poi-card__head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
-  gap:8px;
+  gap: 8px;
 }
 
 .poi-card__name {
@@ -329,9 +381,10 @@ onMounted(async()=>{if(route.query.tripId){try{contextTrip.value=await tripApi.d
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin:0;
-  font-size: var(--tp-font-body);
+  font-size: var(--tp-font-section);
   font-weight: 600;
-  line-height: 1.4;
+  color: #25334d;
+  line-height: 1.5;
 }
 
 .poi-card__category { max-width: 100%; }
@@ -342,116 +395,111 @@ onMounted(async()=>{if(route.query.tripId){try{contextTrip.value=await tripApi.d
 }
 
 .poi-card__addr {
-  margin:0;
-  font-size: var(--tp-font-title);
+  margin: 0;
+  min-height: 44px;
+  font-size: var(--tp-font-body);
   color: var(--tp-text-secondary);
-  display: flex;
-  gap:4px;
   line-height: 1.6;
 }
 
-.poi-card__meta {
-  margin:0;
-  font-size: var(--tp-font-title);
-  color:var(--tp-text-secondary);
-  display: flex;
-  justify-content: space-between;
-  gap:8px;
-  flex-wrap: wrap;
-}
-
-.coord {
-  font-variant-numeric: tabular-nums;
-}
-
-.poi-card .el-button {
-  align-self: flex-start;
-}
-
-.attr-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap:12px;
-}
-
-.attr-card {
-  border: 1px solid var(--tp-border);
-  border-radius: 12px;
-  padding:16px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap:8px;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.attr-card:hover {
-  box-shadow: 0 6px 20px rgba(31, 45, 61, 0.08);
-  transform: translateY(-2px);
-}
-
-.attr-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap:8px;
-}
-
-.attr-card__name {
-  margin:0;
-  font-size: var(--tp-font-section);
-  font-weight: 600;
-  cursor: pointer;
-  line-height: 1.4;
-}
-
-.attr-card__name:hover {
-  color: var(--tp-primary);
-}
-
-.attr-card__tags {
-  display: flex;
-  gap:4px;
-  flex-wrap: wrap;
-}
-
-.attr-card__desc {
-  margin:0;
-  font-size: var(--tp-font-title);
-  color: var(--tp-text-secondary);
-  line-height: 1.7;
+.poi-card__addr span {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 40px;
+  overflow-wrap: anywhere;
 }
 
-.attr-card__meta {
-  display: flex;
-  gap:16px;
-  font-size: var(--tp-font-title);
-  color: var(--tp-text-secondary);
-}
-
-.attr-card__meta span {
-  display: inline-flex;
-  align-items: center;
-  gap:4px;
-}
-
-.attr-card__actions {
+.poi-card__meta {
+  margin: 4px 0 0;
+  font-size: var(--tp-font-body);
+  color: #61708a;
   display: flex;
   align-items: center;
-  gap:4px;
-  border-top: 1px dashed var(--tp-border);
-  padding-top:8px;
-  margin-top:auto;
+  gap: 4px;
+  min-width: 0;
+  line-height: 1.6;
 }
 
-.pagination {
+.poi-card__meta .el-icon {
+  flex-shrink: 0;
+  color: var(--tp-primary);
+}
+
+.poi-card__meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poi-card__footer {
   display: flex;
-  justify-content: flex-end;
-  margin-top:16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid #eef2f8;
+  padding-top: 12px;
+  margin-top: auto;
+}
+
+.poi-card__footer .el-button {
+  margin-left: auto;
+  min-height: 32px;
+}
+
+.poi-card__coordinates {
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  color: #61708a;
+  font: inherit;
+  font-size: var(--tp-font-body);
+  cursor: pointer;
+}
+
+.poi-card__coordinates:hover {
+  color: var(--tp-primary);
+}
+
+.poi-card__coordinates:focus-visible {
+  outline: 2px solid var(--tp-primary);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.attraction-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .poi-search__toolbar {
+    padding: 12px;
+  }
+
+  .poi-search__keywords,
+  .poi-search__toolbar :deep(.el-cascader),
+  .attraction-filters > .el-input,
+  .attraction-filters :deep(.el-cascader) {
+    width: 100% !important;
+    flex-shrink: 0;
+  }
+
+  .attraction-filters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .attraction-filters .el-switch {
+    flex-shrink: 0;
+  }
+
+  .poi-results-summary > span:last-child {
+    display: none;
+  }
+
+  .poi-search > .section-head > .el-tag {
+    display: none;
+  }
 }
 </style>

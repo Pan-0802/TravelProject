@@ -48,7 +48,7 @@
         <div class="form-tip">消费日期需落在旅行日期范围内（{{ trip.startDate }} ~ {{ trip.endDate }}）</div>
       </el-form-item>
 
-      <el-form-item label="说明">
+      <el-form-item label="说明" prop="description" :error="fieldErrors.description">
         <el-input
           v-model.trim="form.description"
           type="textarea"

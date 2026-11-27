@@ -148,14 +148,19 @@ watch(() => props.summary, renderChart, { deep: true, immediate: true })
 
 .budget-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap:16px;
   margin-top:16px;
 }
 
+.budget-grid > .tp-card {
+  min-width: 0;
+  margin-top: 0;
+}
+
 .budget-title {
   margin:0 0 12px;
-  font-size: var(--tp-font-body);
+  font-size: var(--tp-font-section);
   font-weight: 600;
 }
 </style>

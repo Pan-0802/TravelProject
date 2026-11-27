@@ -8,12 +8,12 @@
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="handleOpen"
   >
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" class="itinerary-edit-form">
       <el-form-item label="活动名称" prop="itemName" :error="fieldErrors.itemName">
         <el-input v-model.trim="form.itemName" maxlength="150" show-word-limit placeholder="例如：解放碑步行游览" />
       </el-form-item>
 
-      <el-form-item label="时间段">
+      <el-form-item label="时间段" prop="endTime" :error="fieldErrors.endTime">
         <div class="time-row">
           <el-time-picker
             v-model="form.startTime"
@@ -36,7 +36,7 @@
         <p v-if="overlapNames.length" class="overlap-hint" role="status">与 {{ overlapNames.join('、') }} 时间重叠，请确认安排；保存不会调整其他活动的时间。</p>
       </el-form-item>
 
-      <el-form-item label="关联景点">
+      <el-form-item label="关联景点" prop="attractionId" :error="fieldErrors.attractionId">
         <el-select
           v-model="form.attractionId"
           placeholder="可选，仅本地自建景点"
@@ -55,7 +55,7 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="交通方式">
+      <el-form-item label="交通方式" prop="transportation" :error="fieldErrors.transportation">
         <el-select
           v-model="form.transportation"
           placeholder="可选"
@@ -69,7 +69,7 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="预计费用">
+      <el-form-item label="预计费用" prop="estimatedCost" :error="fieldErrors.estimatedCost">
         <el-input-number
           v-model="form.estimatedCost"
           :min="0"
@@ -82,7 +82,7 @@
         <span class="unit">元</span>
       </el-form-item>
 
-      <el-form-item label="备注">
+      <el-form-item label="备注" prop="note" :error="fieldErrors.note">
         <el-input
           v-model.trim="form.note"
           type="textarea"
@@ -131,7 +131,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => Boolean(props.item?.itemId))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
-const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({})
+const { fieldErrors, submitError, clearErrors, showError } = useFormErrors({startTime:'endTime'})
 const attractions = ref<Attraction[]>([])
 const attractionLoading = ref(false)
 
@@ -150,7 +150,17 @@ const rules: FormRules = {
   itemName: [
     { required: true, message: '请输入活动名称', trigger: 'blur' },
     { min: 1, max: 150, message: '活动名称长度为 1-150 个字符', trigger: 'blur' }
-  ]
+  ],
+  endTime:[{validator:(_rule,value,callback)=>{
+    if(form.startTime&&value&&value<form.startTime)return callback(new Error('结束时间不能早于开始时间，请调整时间段'))
+    callback()
+  },trigger:'change'}],
+  transportation:[{max:60,message:'交通方式最多60字，请缩短后重试',trigger:'change'}],
+  estimatedCost:[{validator:(_rule,value,callback)=>{
+    if(value===null||value===undefined||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>99999999.99)return callback(new Error('请填写0至99999999.99元之间的费用'))
+    callback()
+  },trigger:'change'}],
+  note:[{max:500,message:'备注最多500字，请精简后重试',trigger:'blur'}]
 }
 
 async function loadAttractions() {
@@ -194,15 +204,6 @@ async function handleSubmit() {
   clearErrors()
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid || submitting.value) return
-
-  if (form.startTime && form.endTime && form.endTime < form.startTime) {
-    ElMessage.warning('结束时间不能早于开始时间')
-    return
-  }
-  if (form.note && form.note.length > 500) {
-    ElMessage.warning('备注最多 500 字')
-    return
-  }
 
   const payload = {
     itemName: form.itemName,
@@ -254,4 +255,6 @@ async function handleSubmit() {
   font-size: var(--tp-font-body);
 }
 .placement-hint,.overlap-hint{flex-basis:100%;font-size: var(--tp-font-body);line-height:1.7;margin:4px 0 0;color:var(--tp-text-secondary)}.overlap-hint{color:var(--tp-text-secondary)}
+.itinerary-edit-form :deep(.el-form-item.is-error .placement-hint),
+.itinerary-edit-form :deep(.el-form-item.is-error .overlap-hint) { display:none; }
 </style>

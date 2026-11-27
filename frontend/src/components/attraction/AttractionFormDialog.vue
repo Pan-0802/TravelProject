@@ -29,7 +29,7 @@
         <el-input v-model.trim="form.category" maxlength="40" placeholder="例如：观景 / 美食 / 博物馆" />
       </el-form-item>
 
-      <el-form-item label="建议游玩">
+      <el-form-item label="建议游玩" prop="suggestedDurationMinutes" :error="fieldErrors.suggestedDurationMinutes">
         <el-input-number
           v-model="form.suggestedDurationMinutes"
           :min="0"
@@ -41,7 +41,7 @@
         <span class="unit">分钟（0 表示未填写）</span>
       </el-form-item>
 
-      <el-form-item label="参考门票">
+      <el-form-item label="参考门票" prop="referenceTicketPrice" :error="fieldErrors.referenceTicketPrice">
         <el-input-number
           v-model="form.referenceTicketPrice"
           :min="0"
@@ -55,7 +55,7 @@
         <span class="unit">元</span>
       </el-form-item>
 
-      <el-form-item label="描述">
+      <el-form-item label="描述" prop="description" :error="fieldErrors.description">
         <el-input
           v-model.trim="form.description"
           type="textarea"
@@ -117,7 +117,12 @@ const rules: FormRules = {
     { required: true, message: '请输入所在城市', trigger: 'blur' },
     { min: 1, max: 80, message: '城市长度为 1-80 个字符', trigger: 'blur' }
   ],
-  category: [{ max: 40, message: '分类最多 40 个字符', trigger: 'blur' }]
+  category: [{ max: 40, message: '分类最多 40 个字符', trigger: 'blur' }],
+  suggestedDurationMinutes:[{validator:(_rule,value,callback)=>{
+    if(value!==null&&value!==undefined&&(!Number.isInteger(Number(value))||Number(value)<0||Number(value)>65535))return callback(new Error('请填写0至65535之间的整数分钟数'))
+    callback()
+  },trigger:'change'}],
+  description:[{max:500,message:'描述最多500字，请精简后重试',trigger:'blur'}]
 }
 
 function handleOpen() {
@@ -139,11 +144,6 @@ async function handleSubmit() {
   if (!valid || submitting.value) return
 
   const duration = Number(form.suggestedDurationMinutes)
-  if (duration < 0 || duration > 65535 || !Number.isInteger(duration)) {
-    ElMessage.warning('建议游玩时长需为 0-65535 之间的整数')
-    return
-  }
-
   const payload: AttractionPayload = {
     name: form.name,
     city: form.city,

@@ -193,7 +193,7 @@ test('编辑弹窗取消不影响草稿，时间错误可修正再应用',async(
  await page.getByRole('button',{name:'编辑：故宫博物院',exact:true}).click()
  await editor.getByPlaceholder('结束时间',{exact:true}).fill('08:00');await editor.getByPlaceholder('结束时间',{exact:true}).press('Tab')
  await editor.getByRole('button',{name:'应用修改',exact:true}).click()
- await expect(editor.getByRole('alert')).toContainText('结束时间不能早于开始时间')
+ await expect(editor.locator('.el-form-item').filter({hasText:'活动时间'}).locator('.el-form-item__error')).toContainText('结束时间不能早于开始时间')
  await editor.getByPlaceholder('结束时间',{exact:true}).fill('10:30');await editor.getByPlaceholder('结束时间',{exact:true}).press('Tab')
  await editor.getByRole('button',{name:'应用修改',exact:true}).click()
  await expect(editor).not.toBeVisible();await expect(page.locator('.timeline-time').first()).toContainText('10:30')

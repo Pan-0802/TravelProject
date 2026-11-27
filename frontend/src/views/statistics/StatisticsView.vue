@@ -302,9 +302,14 @@ onMounted(loadAll)
 <style scoped>
 .chart-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap:16px;
   margin:16px 0;
+}
+
+.chart-grid > .tp-card {
+  min-width: 0;
+  margin-top: 0;
 }
 
 .chart-head {
@@ -318,7 +323,7 @@ onMounted(loadAll)
 
 .chart-title {
   margin:0 0 4px;
-  font-size: var(--tp-font-body);
+  font-size: var(--tp-font-section);
   font-weight: 600;
 }
 
@@ -343,7 +348,7 @@ onMounted(loadAll)
 
 @media (max-width: 768px) {
   .chart-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
