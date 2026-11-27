@@ -61,6 +61,7 @@ test('未绑定草稿选择不同目的地旅行时阻止提交', async ({ page 
   await page.getByRole('option', { name: /旅行952/ }).click()
   await expect(page.getByText('所选旅行的目的地或起止日期与方案不一致，请选择匹配的旅行或重新生成方案。')).toBeVisible()
   await page.getByRole('button', { name: '确认保存到旅行', exact: true }).first().click()
-  await expect(page.getByText('所选旅行目的地或日期与方案不一致，请更换旅行或重新生成方案', { exact: true })).toBeVisible()
+  await expect(page.locator('.save-bar__field .el-form-item__error')).toHaveText('请选择目的地和日期与方案一致的旅行')
+  await expect(page.locator('.save-bar__field')).toHaveClass(/is-error/)
   expect(submissions).toBe(0)
 })

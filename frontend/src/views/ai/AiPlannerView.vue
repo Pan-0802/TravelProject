@@ -5,7 +5,7 @@
     <div class="planner-grid">
       <div class="tp-card tp-card__body">
         <h2>这次想怎么旅行？</h2>
-        <el-form ref="formRef" :model="form" :rules="rules" label-position="top" scroll-to-error @submit.prevent="generate">
+        <el-form ref="formRef" :model="form" :rules="rules" label-position="top" scroll-to-error :scroll-into-view-options="{block:'nearest'}" @submit.prevent="generate">
           <el-form-item label="基于已有旅行（自动带入目的地、日期与预算）" :error="fieldErrors.tripId">
             <el-select v-model="selectedTripId" clearable filterable placeholder="选择已有旅行，或直接填写新旅行" style="width:100%" :disabled="generating" @change="useTrip">
               <el-option v-for="trip in trips" :key="trip.tripId" :label="trip.title+'（'+trip.destination+' · '+trip.startDate+' ~ '+trip.endDate+'）'" :value="trip.tripId"/>

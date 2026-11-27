@@ -112,6 +112,38 @@ test('历史方案本地校验和服务端嵌套错误落到对应活动字段',
   await expect(name).toHaveValue('故宫博物院')
 })
 
+test('手动行程的时间错误显示在时间段内并阻止保存', async ({ page }) => {
+  const state = await setup(page); await page.goto('/trips/1')
+  await page.getByRole('button', { name: '添加行程', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: /添加行程（/ })
+  await dialog.getByPlaceholder('例如：解放碑步行游览').fill('午后参观')
+  await dialog.getByPlaceholder('开始时间', { exact: true }).fill('16:00')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).fill('15:00')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).press('Tab')
+  await dialog.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(field(page, '时间段').locator('.el-form-item__error')).toContainText('结束时间不能早于开始时间')
+  expect(state.writes).toHaveLength(0)
+})
+
+test('景点加入行程的跨天提示跟随时间字段，再次打开不残留旧错误', async ({ page }) => {
+  const state = await setup(page); await page.goto('/attractions?tripId=1')
+  await page.locator('.el-table__body tbody tr').first().getByRole('button', { name: '详情', exact: true }).click()
+  const detail = page.getByRole('dialog', { name: '景点详情', exact: true })
+  await detail.getByRole('button', { name: '加入旅行行程', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '把景点加入旅行', exact: true })
+  await expect(dialog.getByRole('button', { name: '加入并查看行程', exact: true })).toBeEnabled()
+  await dialog.getByPlaceholder('选择时间', { exact: true }).fill('23:00')
+  await dialog.getByPlaceholder('选择时间', { exact: true }).press('Tab')
+  await dialog.getByRole('button', { name: '加入并查看行程', exact: true }).click()
+  await expect(field(page, '开始游玩时间（可选）').locator('.el-form-item__error')).toContainText('请选择更早的开始时间')
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await detail.getByRole('button', { name: '加入旅行行程', exact: true }).click()
+  await expect(dialog.getByPlaceholder('选择时间', { exact: true })).toHaveValue('')
+  await expect(dialog.locator('.el-form-item__error')).toHaveCount(0)
+  expect(state.writes).toHaveLength(0)
+})
+
 for (const [name, url, ready] of [
   ['旅行列表', '/trips', '.el-table__body tbody tr'], ['景点探索', '/attractions', '.el-table__body tbody tr'],
   ['收藏列表', '/favorites', '.el-table__body tbody tr'], ['AI规划', '/ai', '.history-entry'],
@@ -127,6 +159,7 @@ for (const [name, url, ready] of [
     const canvasFonts = await page.evaluate(() => [...(window as any).__chartFonts] as string[])
     expect(canvasFonts.length).toBeGreaterThan(0)
     expect(canvasFonts.every(font => ['14', '18', '24'].includes(font.match(/(\d+(?:\.\d+)?)px/)?.[1] || '')), JSON.stringify(canvasFonts)).toBeTruthy()
+    await page.waitForTimeout(1600)
     await shot(page, 'statistics-aligned-color')
   }
 })
@@ -139,6 +172,7 @@ test('统计和预算的同排卡片顶边对齐', async ({ page }) => {
   await expect(page.locator('.budget-grid > .tp-card')).toHaveCount(2)
   const budgetTops = await page.locator('.budget-grid > .tp-card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().top))
   expect(Math.abs(budgetTops[0]! - budgetTops[1]!)).toBeLessThan(1)
+  await page.waitForTimeout(1600)
   await shot(page, 'budget-aligned-color')
 })
 
